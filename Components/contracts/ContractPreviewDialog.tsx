@@ -61,7 +61,13 @@ export default function ContractPreviewDialog({
   
   // Default to PDF view for existing contracts with signed PDF
   // Ensure URL is absolute - if relative, prepend API base URL
-  const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+  // Extract base URL without /api suffix for file URLs
+  const getBaseUrl = () => {
+    const apiUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000/api';
+    // Remove /api if present
+    return apiUrl.replace(/\/api\/?$/, '') || 'http://localhost:3000';
+  };
+  const API_BASE_URL = getBaseUrl();
   let signedContractUrl = isViewingExisting ? (contractData as any).signed_contract_url : null;
   if (signedContractUrl && signedContractUrl.startsWith('/')) {
     // Relative path - make it absolute
