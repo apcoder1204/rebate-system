@@ -6,14 +6,7 @@ import helmet from 'helmet';
  * Security headers middleware
  */
 export const securityHeaders = helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
+  contentSecurityPolicy: false, // Disable CSP for API - it's handled by CORS
   crossOriginEmbedderPolicy: false, // Allow file uploads and cross-origin requests
   crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow cross-origin resource sharing
   crossOriginOpenerPolicy: { policy: "unsafe-none" }, // Allow cross-origin requests for API
