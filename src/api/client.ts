@@ -1,11 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
-// Debug: Log API URL in development
-if (import.meta.env.DEV) {
-  console.log('🔗 API Base URL:', API_BASE_URL);
-  console.log('🔗 VITE_API_URL env:', import.meta.env.VITE_API_URL || 'NOT SET');
-}
-
 const LS_KEY = "rebate_user";
 const TOKEN_KEY = "rebate_token";
 
@@ -42,30 +36,18 @@ export async function apiRequest(
 ): Promise<any> {
   const token = getToken();
   
-  const headers: Record<string, string> = {
+  const headers: any = {
     'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
+    ...options.headers,
   };
   
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
   
-  const fullUrl = `${API_BASE_URL}${endpoint}`;
-  
-  // Validate URL before making request
-  try {
-    new URL(fullUrl);
-  } catch (error) {
-    console.error('❌ Invalid API URL:', fullUrl);
-    console.error('❌ Please set VITE_API_URL in your .env file');
-    throw new Error(`Invalid API URL: ${fullUrl}. Please configure VITE_API_URL environment variable.`);
-  }
-  
-  const response = await fetch(fullUrl, {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers,
-    credentials: 'include', // Include credentials for CORS
   });
   
   // Handle 401 Unauthorized (token expired/invalid)
@@ -84,13 +66,6 @@ export async function apiRequest(
   }
   
   if (!response.ok) {
-    // Handle network errors
-    if (response.status === 0 || response.type === 'error') {
-      console.error('❌ Network Error - Could not reach API');
-      console.error('❌ API URL:', fullUrl);
-      console.error('❌ Check if VITE_API_URL is correct and backend is running');
-      throw new Error(`Cannot connect to API at ${API_BASE_URL}. Please check your backend server and VITE_API_URL configuration.`);
-    }
     const error = await response.json().catch(() => ({ error: 'Request failed' }));
     throw new Error(error.error || `HTTP error! status: ${response.status}`);
   }
@@ -116,7 +91,6 @@ export async function apiUpload(
     method: 'POST',
     headers,
     body: formData,
-    credentials: 'include', // Include credentials for CORS
   });
   
   // Handle 401 Unauthorized (token expired/invalid)
