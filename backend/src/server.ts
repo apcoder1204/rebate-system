@@ -14,11 +14,81 @@ const PORT = process.env.PORT || 3000;
 // Security middleware (must be first)
 app.use(securityHeaders);
 
-// CORS configuration
+// CORS configuration - Allow all necessary origins and methods
+// Normalize URLs: if no protocol specified, add https:// (and also allow http:// for flexibility)
+const normalizeOrigins = (urls: string[]): string[] => {
+  const normalized: string[] = [];
+  urls.forEach(url => {
+    url = url.trim();
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      // If no protocol, add both http and https versions
+      normalized.push(`https://${url}`);
+      normalized.push(`http://${url}`);
+    } else {
+      normalized.push(url);
+    }
+  });
+  return normalized;
+};
+
+const defaultOrigins = ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:4173', 'http://127.0.0.1:5173', 'http://127.0.0.1:3000', 'http://127.0.0.1:4173'];
+const allowedOrigins = process.env.FRONTEND_URL 
+  ? normalizeOrigins(process.env.FRONTEND_URL.split(','))
+  : defaultOrigins;
+
+console.log(`🌐 CORS Configuration:`);
+console.log(`   Allowed Origins: ${allowedOrigins.join(', ')}`);
+console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`   Credentials: enabled`);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, Postman, or curl)
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    // Check if origin is in allowed list (exact match or domain match)
+    const isAllowed = allowedOrigins.some(allowed => {
+      // Exact match
+      if (allowed === origin) return true;
+      // Domain match (handle with/without protocol, with/without www)
+      try {
+        const originUrl = new URL(origin);
+        const allowedUrl = new URL(allowed);
+        return originUrl.hostname === allowedUrl.hostname;
+      } catch {
+        return false;
+      }
+    });
+    
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      // In development, allow all origins for easier testing
+      if (process.env.NODE_ENV !== 'production') {
+        callback(null, true);
+      } else {
+        console.warn(`⚠️  CORS blocked origin: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    }
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Allow-Headers',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
   optionsSuccessStatus: 200,
+  maxAge: 86400, // 24 hours
 }));
 
 // Body parsing with size limits

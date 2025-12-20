@@ -111,7 +111,7 @@ DB_PASSWORD=
 
 # Server Configuration
 PORT=10000
-FRONTEND_URL=https://your-frontend.vercel.app
+ =https://your-frontend.vercel.app
 
 # JWT Secret (generate a strong random string)
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production

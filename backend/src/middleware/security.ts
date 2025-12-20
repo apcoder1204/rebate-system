@@ -14,7 +14,9 @@ export const securityHeaders = helmet({
       imgSrc: ["'self'", "data:", "https:"],
     },
   },
-  crossOriginEmbedderPolicy: false, // Allow file uploads
+  crossOriginEmbedderPolicy: false, // Allow file uploads and cross-origin requests
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow cross-origin resource sharing
+  crossOriginOpenerPolicy: { policy: "unsafe-none" }, // Allow cross-origin requests for API
 });
 
 /**

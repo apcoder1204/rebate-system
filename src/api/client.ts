@@ -48,6 +48,7 @@ export async function apiRequest(
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers,
+    credentials: 'include', // Include credentials for CORS
   });
   
   // Handle 401 Unauthorized (token expired/invalid)
@@ -91,6 +92,7 @@ export async function apiUpload(
     method: 'POST',
     headers,
     body: formData,
+    credentials: 'include', // Include credentials for CORS
   });
   
   // Handle 401 Unauthorized (token expired/invalid)
