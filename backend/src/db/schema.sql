@@ -108,7 +108,8 @@ CREATE TABLE IF NOT EXISTS verification_codes (
 
 -- Index for faster lookups
 CREATE INDEX IF NOT EXISTS idx_verification_codes_phone ON verification_codes(phone);
-CREATE INDEX IF NOT EXISTS idx_verification_codes_email ON verification_codes(email);
+-- idx_verification_codes_email is created in add_email_verification.sql migration
+-- CREATE INDEX IF NOT EXISTS idx_verification_codes_email ON verification_codes(email);
 CREATE INDEX IF NOT EXISTS idx_verification_codes_code ON verification_codes(code);
 CREATE INDEX IF NOT EXISTS idx_verification_codes_expires ON verification_codes(expires_at);
 
