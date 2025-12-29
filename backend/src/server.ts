@@ -15,9 +15,33 @@ const PORT = process.env.PORT || 3000;
 app.use(securityHeaders);
 
 // CORS configuration
+const allowedOrigins = [
+  'https://rebate.cctvpoint.org', // Production Frontend
+  'http://localhost:5173',        // Local Frontend
+  'http://localhost:3000',        // Local Backend/API
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000'
+];
+
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      console.warn(`Blocked by CORS: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   optionsSuccessStatus: 200,
 }));
 

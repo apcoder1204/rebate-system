@@ -32,6 +32,7 @@ export const login = async (req: Request, res: Response) => {
     );
     
     if (result.rows.length === 0) {
+      console.log(`Login attempt failed: User not found for email: ${sanitizedEmail}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
@@ -39,6 +40,7 @@ export const login = async (req: Request, res: Response) => {
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     
     if (!isValidPassword) {
+      console.log(`Login attempt failed: Invalid password for email: ${sanitizedEmail}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
@@ -47,6 +49,8 @@ export const login = async (req: Request, res: Response) => {
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as any }
     );
+    
+    console.log(`Login successful for user: ${user.email} (${user.role})`);
     
     res.json({
       user: {
@@ -59,8 +63,13 @@ export const login = async (req: Request, res: Response) => {
       },
       token,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Login error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      email: req.body?.email,
+    });
     res.status(500).json({ error: 'Internal server error' });
   }
 };

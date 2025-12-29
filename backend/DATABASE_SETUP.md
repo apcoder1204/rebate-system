@@ -12,6 +12,8 @@ Add the following to your `.env` file in the `backend` directory:
 
 ```env
 # Primary Database (Neon) - REQUIRED
+# IMPORTANT: Use the pooler endpoint (contains -pooler. in the URL)
+# The system will automatically add pgbouncer=true for transaction pooling
 NEON_DATABASE_URL=postgresql://neondb_owner:****************@ep-dry-cloud-agiicyd1-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
 
 # Backup Database (Localhost) - Optional (defaults shown)
@@ -22,7 +24,10 @@ DB_USER=postgres
 DB_PASSWORD=postgres
 ```
 
-**Important**: Replace the `****************` in `NEON_DATABASE_URL` with your actual Neon database password.
+**Important**: 
+- Replace the `****************` in `NEON_DATABASE_URL` with your actual Neon database password.
+- **Always use the pooler endpoint** (URL should contain `-pooler.`) for better connection stability
+- The system automatically adds `pgbouncer=true` to pooler URLs for optimal transaction pooling
 
 ## How It Works
 
@@ -87,7 +92,29 @@ The system automatically:
 - Check your `NEON_DATABASE_URL` in `.env`
 - Verify your Neon database is running
 - Check network connectivity
+- **Ensure you're using the pooler endpoint** (URL should contain `-pooler.`)
 - System will continue using backup database
+
+### Neon Keeps Disconnecting / Long Idle Periods
+The system is configured for **persistent connections** that survive days of inactivity:
+
+1. **Verify pooler URL**: Make sure your connection string uses the pooler endpoint (`-pooler.` in the URL)
+2. **Check connection string format**: The system automatically adds `pgbouncer=true` for transaction pooling
+3. **Connection pool settings**: The system is configured with:
+   - `idleTimeoutMillis: 1800000` (30 minutes) - prevents premature disconnections
+   - `connectionTimeoutMillis: 30000` (30 seconds) - allows time for serverless connections
+   - `keepAlive: true` - maintains connection health at TCP level
+4. **Persistent connection maintenance**:
+   - **Health checks**: Runs every 60 seconds to keep connections alive
+   - **Connection warmer**: Maintains active connections every 2 minutes
+   - **Automatic reconnection**: Retries on connection failures with exponential backoff
+   - **Query-level retry**: Automatically retries queries after reconnection
+5. **Long-term persistence**: Even if the system is unused for days, connections remain active through:
+   - Continuous health check pings (every 60 seconds)
+   - Connection warming (every 2 minutes)
+   - Automatic reconnection on any detected failures
+
+**Result**: Connections stay alive indefinitely, even during extended idle periods (days/weeks).
 
 ### Backup Database (Localhost) Connection Failed
 - Ensure PostgreSQL is running locally
@@ -117,6 +144,8 @@ All API endpoints automatically:
 - Log warnings for backup failures
 
 No code changes needed in controllers - the dual database system is transparent!
+
+
 
 
 

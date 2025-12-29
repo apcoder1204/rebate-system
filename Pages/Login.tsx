@@ -63,8 +63,19 @@ export default function LoginPage() {
       setTimeout(() => {
         window.history.pushState(null, "", routes.Dashboard);
       }, 100);
-    } catch (error) {
-      showError("Invalid email or password");
+    } catch (error: any) {
+      console.error('Login error:', error);
+      // Show more detailed error message
+      const errorMessage = error?.message || 'Unknown error occurred';
+      if (errorMessage.includes('rate limit') || errorMessage.includes('Too many')) {
+        showError("Too many login attempts. Please wait 15 minutes and try again.");
+      } else if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
+        showError("Cannot connect to server. Please check if the backend is running.");
+      } else if (errorMessage.includes('Invalid credentials') || errorMessage.includes('Invalid email')) {
+        showError("Invalid email or password");
+      } else {
+        showError(errorMessage || "Login failed. Please try again.");
+      }
     }
     setLoading(false);
   };

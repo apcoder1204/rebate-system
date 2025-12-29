@@ -22,10 +22,14 @@ export const securityHeaders = helmet({
  */
 export const authRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
+  max: process.env.NODE_ENV === 'production' ? 5 : 20, // More lenient in development
   message: 'Too many authentication attempts, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for localhost in development
+    return process.env.NODE_ENV !== 'production' && req.ip === '::1';
+  },
 });
 
 /**
