@@ -15,6 +15,18 @@ const PORT = process.env.PORT || 3000;
 app.use(securityHeaders);
 
 // CORS configuration
+const allowedOrigins = [
+  'https://rebate.cctvpoint.org', // Production Frontend
+  'http://localhost:5173',        // Local Frontend
+  'http://localhost:3000',        // Local Backend/API
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000'
+];
+
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
