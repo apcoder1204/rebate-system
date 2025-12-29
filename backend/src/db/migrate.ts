@@ -1,6 +1,37 @@
 import fs from 'fs';
 import path from 'path';
 import { primaryPool, backupPool } from './connection';
+import { Pool } from 'pg';
+
+// Function to run all migration files from migrations directory
+async function runMigrations(pool: Pool, dbName: string) {
+  const migrationsDir = path.join(__dirname, 'migrations');
+  
+  if (!fs.existsSync(migrationsDir)) {
+    console.log(`ℹ️  No migrations directory found at ${migrationsDir}`);
+    return;
+  }
+  
+  const files = fs.readdirSync(migrationsDir)
+    .filter(file => file.endsWith('.sql'))
+    .sort(); // Sort to ensure order
+    
+  console.log(`📂 Found ${files.length} migration files for ${dbName}`);
+  
+  for (const file of files) {
+    const filePath = path.join(migrationsDir, file);
+    const sql = fs.readFileSync(filePath, 'utf8');
+    
+    try {
+      await pool.query(sql);
+      console.log(`  ✅ Applied migration: ${file}`);
+    } catch (error: any) {
+      console.error(`  ❌ Failed to apply migration ${file}:`, error.message);
+      // We continue, as some might fail if already applied in a non-idempotent way, 
+      // but most of ours are IF NOT EXISTS
+    }
+  }
+}
 
 async function migrate() {
   try {
@@ -9,16 +40,24 @@ async function migrate() {
     
     // Migrate primary database (Neon)
     try {
+      console.log('🔄 Running base schema migration on Primary (Neon)...');
       await primaryPool.query(schema);
-      console.log('✅ Primary database (Neon) schema created successfully!');
+      console.log('✅ Base schema applied to Primary.');
+      
+      // Run additional migrations
+      await runMigrations(primaryPool, 'Primary (Neon)');
     } catch (error: any) {
       console.error('❌ Primary database migration failed:', error.message);
     }
     
     // Migrate backup database (localhost)
     try {
+      console.log('🔄 Running base schema migration on Backup (Localhost)...');
       await backupPool.query(schema);
-      console.log('✅ Backup database (localhost) schema created successfully!');
+      console.log('✅ Base schema applied to Backup.');
+      
+      // Run additional migrations
+      await runMigrations(backupPool, 'Backup (Localhost)');
     } catch (error: any) {
       console.error('⚠️  Backup database migration failed:', error.message);
     }

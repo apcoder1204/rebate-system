@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS users (
   full_name VARCHAR(255) NOT NULL,
   phone VARCHAR(50),
   role VARCHAR(50) DEFAULT 'user' CHECK (role IN ('admin', 'manager', 'staff', 'user')),
+  phone_verified BOOLEAN DEFAULT FALSE,
+  email_verified BOOLEAN DEFAULT FALSE,
   created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -95,9 +97,10 @@ CREATE TRIGGER update_orders_updated_date BEFORE UPDATE ON orders
 -- Verification codes table for phone verification and password reset
 CREATE TABLE IF NOT EXISTS verification_codes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  phone VARCHAR(50) NOT NULL,
+  phone VARCHAR(50),
+  email VARCHAR(255),
   code VARCHAR(10) NOT NULL,
-  purpose VARCHAR(50) NOT NULL CHECK (purpose IN ('registration', 'password_reset')),
+  purpose VARCHAR(50) NOT NULL CHECK (purpose IN ('registration', 'password_reset', 'email_verification')),
   verified BOOLEAN DEFAULT FALSE,
   expires_at TIMESTAMP NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -105,11 +108,13 @@ CREATE TABLE IF NOT EXISTS verification_codes (
 
 -- Index for faster lookups
 CREATE INDEX IF NOT EXISTS idx_verification_codes_phone ON verification_codes(phone);
+CREATE INDEX IF NOT EXISTS idx_verification_codes_email ON verification_codes(email);
 CREATE INDEX IF NOT EXISTS idx_verification_codes_code ON verification_codes(code);
 CREATE INDEX IF NOT EXISTS idx_verification_codes_expires ON verification_codes(expires_at);
 
--- Add phone_verified column to users table
+-- Add phone_verified column to users table (if not exists in create table)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE;
 
 -- Role Requests table for approval-based role assignment
 CREATE TABLE IF NOT EXISTS role_requests (
