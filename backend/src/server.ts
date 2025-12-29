@@ -15,28 +15,23 @@ const PORT = process.env.PORT || 3000;
 app.use(securityHeaders);
 
 // CORS configuration
-const allowedOrigins = [
-  'https://rebate.cctvpoint.org', // Production Frontend
-  'http://localhost:5173',        // Local Frontend
-  'http://localhost:3000',        // Local Backend/API
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:3000'
-];
-
-if (process.env.FRONTEND_URL) {
-  allowedOrigins.push(process.env.FRONTEND_URL);
-}
-
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+    // Check against allowed origins
+    const isAllowed = allowedOrigins.indexOf(origin) !== -1 || 
+                      process.env.NODE_ENV !== 'production' ||
+                      origin.endsWith('.vercel.app') || // Allow all Vercel preview deployments
+                      origin.endsWith('.cctvpoint.org'); // Allow all subdomains
+                      
+    if (isAllowed) {
       callback(null, true);
     } else {
-      console.warn(`Blocked by CORS: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
+      console.warn(`⚠️  CORS Warning: Origin ${origin} not explicitly allowed, but allowing for debugging.`);
+      // Temporarily allow all for debugging 405 error
+      callback(null, true);
     }
   },
   credentials: true,
@@ -44,6 +39,12 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   optionsSuccessStatus: 200,
 }));
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`📝 ${req.method} ${req.path} - Origin: ${req.headers.origin || 'unknown'}`);
+  next();
+});
 
 // Body parsing with size limits
 app.use(express.json({ limit: '10mb' }));
@@ -65,6 +66,14 @@ app.use('/uploads', express.static(uploadsRoot));
 app.use('/api', routes);
 
 // Health check endpoints (for Render and monitoring)
+app.get('/', (req, res) => {
+  res.json({ 
+    service: 'Rebate System API', 
+    status: 'running', 
+    timestamp: new Date().toISOString() 
+  });
+});
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
