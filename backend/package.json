@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "npm run migrate && node dist/server.js",
     "migrate": "tsx src/db/migrate.ts",
     "migrate:add-created-by": "tsx src/db/migrate_add_created_by.ts",
     "migrate:manager-approval": "tsx src/db/migrate_manager_approval.ts",
