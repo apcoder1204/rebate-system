@@ -52,9 +52,9 @@ export function Combobox({
     }
   }, [isOpen]);
 
-  // Handle click outside
+  // Handle click outside and scroll/resize
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (
         dropdownRef.current && 
         !dropdownRef.current.contains(event.target as Node) &&
@@ -67,15 +67,13 @@ export function Combobox({
 
     if (isOpen) {
       document.addEventListener("mousedown", handleClickOutside);
-      // Handle window resize/scroll to close or update position (simple approach: close)
-      window.addEventListener("resize", () => setIsOpen(false));
-      window.addEventListener("scroll", () => setIsOpen(false), true);
+      document.addEventListener("touchstart", handleClickOutside);
+      // Removed scroll and resize listeners to prevent closing on mobile interactions (keyboard open, list scroll)
     }
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
-      window.removeEventListener("resize", () => setIsOpen(false));
-      window.removeEventListener("scroll", () => setIsOpen(false), true);
+      document.removeEventListener("touchstart", handleClickOutside);
     };
   }, [isOpen]);
 

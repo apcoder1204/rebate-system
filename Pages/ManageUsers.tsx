@@ -294,26 +294,26 @@ export default function ManageUsers() {
                   return (
                     <div
                       key={user.id}
-                      className="flex items-center justify-between p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+                      className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors gap-4"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center">
+                      <div className="flex items-center gap-4 w-full md:w-auto">
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center flex-shrink-0">
                           <span className="text-white font-semibold">
                             {user.full_name?.charAt(0) || 'U'}
                           </span>
                         </div>
-                        <div>
-                          <p className="font-semibold text-slate-900">{user.full_name}</p>
-                          <p className="text-sm text-slate-600">{user.email}</p>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-900 truncate">{user.full_name}</p>
+                          <p className="text-sm text-slate-600 truncate">{user.email}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
                         {isEditing ? (
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
                             <select
                               value={editingRole?.newRole || userRole}
                               onChange={(e) => setEditingRole({ userId: user.id, newRole: e.target.value })}
-                              className="px-3 py-1 border border-slate-300 rounded-md text-sm"
+                              className="px-3 py-1 border border-slate-300 rounded-md text-sm w-full sm:w-auto"
                               disabled={!isAdmin}
                             >
                               <option value="user">Customer</option>
@@ -321,27 +321,31 @@ export default function ManageUsers() {
                               <option value="manager">Manager</option>
                               <option value="admin">Admin</option>
                             </select>
-                            <Button
-                              size="sm"
-                              onClick={() => handleRoleChange(user.id, editingRole!.newRole)}
-                              disabled={editingRole?.newRole === userRole}
-                            >
-                              Save
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setEditingRole(null)}
-                            >
-                              Cancel
-                            </Button>
+                            <div className="flex gap-2 w-full sm:w-auto">
+                              <Button
+                                size="sm"
+                                onClick={() => handleRoleChange(user.id, editingRole!.newRole)}
+                                disabled={editingRole?.newRole === userRole}
+                                className="flex-1 sm:flex-none"
+                              >
+                                Save
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setEditingRole(null)}
+                                className="flex-1 sm:flex-none"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
                           </div>
                         ) : (
-                          <>
-                            <Badge variant="secondary" className={badgeColor}>
+                          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-start md:justify-end">
+                            <Badge variant="secondary" className={`${badgeColor} mr-2`}>
                               {userRole === 'user' ? 'customer' : userRole}
                             </Badge>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               {canChangeRole && (
                                 <Button
                                   size="sm"
@@ -370,9 +374,9 @@ export default function ManageUsers() {
                                 </span>
                               )}
                             </div>
-                          </>
+                          </div>
                         )}
-                        <p className="text-sm text-slate-500">
+                        <p className="text-sm text-slate-500 whitespace-nowrap hidden md:block">
                           {user.created_date ? format(new Date(user.created_date), 'MMM d, yyyy') : 'N/A'}
                         </p>
                       </div>
@@ -410,20 +414,20 @@ export default function ManageUsers() {
                         key={request.id}
                         className="p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
                       >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
+                        <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                          <div className="flex-1 w-full">
                             <div className="flex items-center gap-3 mb-2">
-                              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center">
+                              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center flex-shrink-0">
                                 <span className="text-white font-semibold text-sm">
                                   {request.user_name?.charAt(0) || 'U'}
                                 </span>
                               </div>
-                              <div>
-                                <p className="font-semibold text-slate-900">{request.user_name}</p>
-                                <p className="text-sm text-slate-600">{request.user_email}</p>
+                              <div className="min-w-0">
+                                <p className="font-semibold text-slate-900 truncate">{request.user_name}</p>
+                                <p className="text-sm text-slate-600 truncate">{request.user_email}</p>
                               </div>
                             </div>
-                            <div className="ml-13 space-y-1">
+                            <div className="ml-0 md:ml-13 space-y-1">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm text-slate-600">Requested Role:</span>
                                 <Badge className={roleColors[request.requested_role] || 'bg-blue-100 text-blue-700'}>
@@ -435,11 +439,11 @@ export default function ManageUsers() {
                               </p>
                             </div>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
                             <Button
                               size="sm"
                               onClick={() => handleReviewRequest(request.id, 'approve')}
-                              className="bg-green-600 hover:bg-green-700"
+                              className="bg-green-600 hover:bg-green-700 flex-1 md:flex-none"
                             >
                               <CheckCircle className="w-4 h-4 mr-1" />
                               Approve
@@ -448,7 +452,7 @@ export default function ManageUsers() {
                               size="sm"
                               variant="outline"
                               onClick={() => handleReviewRequest(request.id, 'reject')}
-                              className="border-red-300 text-red-600 hover:bg-red-50"
+                              className="border-red-300 text-red-600 hover:bg-red-50 flex-1 md:flex-none"
                             >
                               <XCircle className="w-4 h-4 mr-1" />
                               Reject
