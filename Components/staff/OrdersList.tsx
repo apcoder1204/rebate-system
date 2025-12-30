@@ -119,7 +119,7 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
               return (
               <div
                 key={order.id}
-                className={`flex items-center justify-between p-4 border rounded-xl transition-colors ${
+                className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 border rounded-xl transition-colors gap-4 ${
                   isDisputed 
                     ? 'border-red-300 bg-red-50 hover:bg-red-100' 
                     : isLocked
@@ -127,30 +127,35 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
                     : 'border-slate-200 hover:bg-slate-50'
                 }`}
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/30">
+                <div className="flex items-center gap-4 w-full md:w-auto">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/30 flex-shrink-0">
                     <ShoppingCart className="w-6 h-6 text-white" />
                   </div>
-                  <div>
-                    <p className="font-bold text-slate-900">{order.order_number}</p>
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-900 truncate">{order.order_number}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <Calendar className="w-3 h-3 text-slate-400" />
-                      <p className="text-sm text-slate-600">
+                      <Calendar className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                      <p className="text-sm text-slate-600 truncate">
                         {format(new Date(order.order_date), 'MMM d, yyyy')}
                       </p>
                     </div>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-6">
-                  <div className="text-right">
-                    <p className="font-bold text-slate-900">Tsh {parseFloat(String(order.total_amount || 0)).toFixed(2)}</p>
-                    <p className="text-sm text-green-600 font-medium">Tsh {parseFloat(String(order.rebate_amount || 0)).toFixed(2)} rebate</p>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
+                  <div className="flex flex-row sm:flex-col justify-between w-full sm:w-auto sm:text-right gap-2 sm:gap-0">
+                    <div>
+                      <p className="font-bold text-slate-900">Tsh {parseFloat(String(order.total_amount || 0)).toFixed(2)}</p>
+                      <p className="text-sm text-green-600 font-medium">Tsh {parseFloat(String(order.rebate_amount || 0)).toFixed(2)} rebate</p>
+                    </div>
+                    <div className="sm:hidden text-right">
+                       <p className="text-sm text-slate-600">{order.items?.length || 0} items</p>
+                    </div>
                   </div>
-                  <div className="text-right">
+                  <div className="hidden sm:block text-right">
                     <p className="text-sm text-slate-600">{order.items?.length || 0} items</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                     {getStatusBadge(order)}
                     {isLocked && (
                       <Badge className="bg-orange-100 text-orange-700 flex items-center gap-1">
@@ -159,52 +164,54 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
                       </Badge>
                     )}
                     {isDisputed && order.customer_comment && (
-                      <div className="text-xs text-red-700 max-w-xs truncate" title={order.customer_comment}>
+                      <div className="text-xs text-red-700 max-w-xs truncate w-full sm:w-auto" title={order.customer_comment}>
                         <AlertCircle className="w-3 h-3 inline mr-1" />
                         {order.customer_comment.substring(0, 30)}...
                       </div>
                     )}
-                    {((['admin', 'manager'].includes(currentUserRole || '') || (currentUserRole === 'staff' && order.created_by === currentUserId)) && order.customer_status !== 'confirmed') ? (
-                       <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onEdit(order)}
-                        className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    ) : (
-                      // Read-only view for others or confirmed orders
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onEdit(order)} 
-                        className="p-2"
-                      >
-                         <Eye className="w-4 h-4 text-slate-500" />
-                      </Button>
-                    )}
-                    {isLocked && ['admin', 'manager'].includes(currentUserRole || '') && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleUnlock(order.id)}
-                        className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50"
-                        title="Unlock Order"
-                      >
-                        <Unlock className="w-4 h-4" />
-                      </Button>
-                    )}
-                    {currentUserRole === 'admin' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(order.id)}
-                        className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-2 ml-auto sm:ml-0">
+                      {((['admin', 'manager'].includes(currentUserRole || '') || (currentUserRole === 'staff' && order.created_by === currentUserId)) && order.customer_status !== 'confirmed') ? (
+                         <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onEdit(order)}
+                          className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      ) : (
+                        // Read-only view for others or confirmed orders
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onEdit(order)} 
+                          className="p-2"
+                        >
+                           <Eye className="w-4 h-4 text-slate-500" />
+                        </Button>
+                      )}
+                      {isLocked && ['admin', 'manager'].includes(currentUserRole || '') && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUnlock(order.id)}
+                          className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50"
+                          title="Unlock Order"
+                        >
+                          <Unlock className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {currentUserRole === 'admin' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(order.id)}
+                          className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

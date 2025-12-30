@@ -156,29 +156,29 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
               {filteredContracts.map((contract: any) => (
                 <div
                   key={contract.id}
-                  className="flex items-center justify-between p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+                  className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors gap-4"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+                  <div className="flex items-center gap-4 w-full md:w-auto">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30 flex-shrink-0">
                       <FileText className="w-6 h-6 text-white" />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-bold text-slate-900">{contract.contract_number}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <p className="font-bold text-slate-900 truncate">{contract.contract_number}</p>
                         {getStatusBadge(contract.status)}
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-slate-600">
-                        <div className="flex items-center gap-1">
-                          <User className="w-3 h-3" />
-                          <span>{contract.customer_name}</span>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm text-slate-600">
+                        <div className="flex items-center gap-1 truncate">
+                          <User className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate">{contract.customer_name}</span>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Mail className="w-3 h-3" />
-                          <span>{contract.customer_email}</span>
+                        <div className="flex items-center gap-1 truncate">
+                          <Mail className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate">{contract.customer_email}</span>
                         </div>
                         {contract.rebate_percentage && (
                           <div className="flex items-center gap-1">
-                            <Percent className="w-3 h-3" />
+                            <Percent className="w-3 h-3 flex-shrink-0" />
                             <span>{contract.rebate_percentage}%</span>
                           </div>
                         )}
@@ -186,23 +186,23 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
+                    <div className="text-left sm:text-right w-full sm:w-auto">
                       <div className="flex items-center gap-1 text-sm text-slate-600">
-                        <Calendar className="w-3 h-3" />
+                        <Calendar className="w-3 h-3 flex-shrink-0" />
                         <span>
                           {contract.start_date && format(new Date(contract.start_date), 'MMM d, yyyy')} → 
                           {contract.end_date && format(new Date(contract.end_date), 'MMM d, yyyy')}
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                       {contract.status === 'pending_approval' && canApprove && (
                         <Button 
                           variant="default" 
                           size="sm"
                           onClick={() => handleApprove(contract)}
-                          className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+                          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 flex-1 sm:flex-none"
                         >
                           <CheckCircle className="w-4 h-4" />
                           Approve
@@ -213,7 +213,7 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
                           variant="outline" 
                           size="sm"
                           onClick={() => onEdit(contract)}
-                          className="flex items-center gap-2"
+                          className="flex items-center gap-2 flex-1 sm:flex-none"
                         >
                           <Edit className="w-4 h-4" />
                           Edit
@@ -223,7 +223,7 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
                         variant="outline" 
                         size="sm"
                         onClick={() => handleViewDetails(contract)}
-                        className="flex items-center gap-2"
+                        className="flex items-center gap-2 flex-1 sm:flex-none"
                       >
                         <Eye className="w-4 h-4" />
                         View
@@ -233,7 +233,7 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
                           variant="outline" 
                           size="sm"
                           onClick={() => handleDelete(contract.id)}
-                          className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 flex-1 sm:flex-none"
                         >
                           <Trash2 className="w-4 h-4" />
                           Delete

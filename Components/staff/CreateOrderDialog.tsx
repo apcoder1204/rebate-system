@@ -72,7 +72,11 @@ export default function CreateOrderDialog({
 
   useEffect(() => {
     if (formData.customer_id) {
-      const customerContracts = contracts.filter((c: any) => c.customer_id === formData.customer_id);
+      // Filter contracts by customer AND status (must be active or approved)
+      const customerContracts = contracts.filter((c: any) => 
+        c.customer_id === formData.customer_id && 
+        ['active', 'approved'].includes(c.status)
+      );
       setAvailableContracts(customerContracts);
       if (customerContracts.length > 0 && !formData.contract_id) {
         setFormData(prev => ({ ...prev, contract_id: customerContracts[0].id }));
@@ -166,6 +170,8 @@ export default function CreateOrderDialog({
         await Order.create(orderData);
 
         // If first order, activate the pending contract
+        // NOTE: Auto-activation logic removed as we now require explicit approval/active status before order creation.
+        /*
         if (isFirstOrder) {
           const selectedContract = availableContracts.find(c => c.id === formData.contract_id);
           if (selectedContract && selectedContract.status === 'pending') {
@@ -176,6 +182,7 @@ export default function CreateOrderDialog({
             }
           }
         }
+        */
       }
       
       showSuccess(editingOrder ? "Order updated successfully!" : "Order created successfully!", 5000);
