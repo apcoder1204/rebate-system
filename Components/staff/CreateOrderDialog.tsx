@@ -16,6 +16,15 @@ import { Combobox } from "@/Components/ui/combobox";
 import { Plus, Trash2, ShoppingCart } from "lucide-react";
 import { useToast } from "@/Context/ToastContext";
 
+interface CreateOrderDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  contracts: any[];
+  customers: any[];
+  editingOrder: any;
+}
+
 export default function CreateOrderDialog({ 
   open, 
   onClose, 
@@ -23,7 +32,7 @@ export default function CreateOrderDialog({
   contracts, 
   customers, 
   editingOrder 
-}) {
+}: CreateOrderDialogProps) {
   const { showSuccess, showError, showWarning } = useToast();
   const [formData, setFormData] = useState({
     customer_id: "",
@@ -35,7 +44,7 @@ export default function CreateOrderDialog({
     { product_name: "", quantity: "", price: "", total_price: 0 }
   ]);
   
-  const [availableContracts, setAvailableContracts] = useState([]);
+  const [availableContracts, setAvailableContracts] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -63,7 +72,7 @@ export default function CreateOrderDialog({
 
   useEffect(() => {
     if (formData.customer_id) {
-      const customerContracts = contracts.filter(c => c.customer_id === formData.customer_id);
+      const customerContracts = contracts.filter((c: any) => c.customer_id === formData.customer_id);
       setAvailableContracts(customerContracts);
       if (customerContracts.length > 0 && !formData.contract_id) {
         setFormData(prev => ({ ...prev, contract_id: customerContracts[0].id }));
@@ -73,7 +82,7 @@ export default function CreateOrderDialog({
     }
   }, [formData.customer_id, contracts]);
 
-  const updateItem = (index, field, value) => {
+  const updateItem = (index: number, field: string, value: string) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
     
@@ -90,7 +99,7 @@ export default function CreateOrderDialog({
     setItems([...items, { product_name: "", quantity: "", price: "", total_price: 0 }]);
   };
 
-  const removeItem = (index) => {
+  const removeItem = (index: number) => {
     if (items.length > 1) {
       setItems(items.filter((_, i) => i !== index));
     }
@@ -104,7 +113,7 @@ export default function CreateOrderDialog({
     return calculateOrderTotal() * 0.01; // 1% rebate
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.customer_id) {
@@ -135,7 +144,7 @@ export default function CreateOrderDialog({
           product_name: item.product_name,
           quantity: parseInt(String(item.quantity)),
           unit_price: parseFloat(item.price),
-          total_price: parseFloat(item.total_price)
+          total_price: parseFloat(String(item.total_price))
         })),
         total_amount: calculateOrderTotal(),
         rebate_amount: calculateRebateAmount(),
@@ -179,18 +188,18 @@ export default function CreateOrderDialog({
     setSubmitting(false);
   };
 
-  const getCustomerName = (customerId) => {
-    const customer = customers.find(c => c.id === customerId);
+  const getCustomerName = (customerId: string) => {
+    const customer = customers.find((c: any) => c.id === customerId);
     return customer ? customer.full_name : customerId;
   };
 
-  const customerOptions = customers.map(c => ({
+  const customerOptions = customers.map((c: any) => ({
     value: c.id,
     label: c.full_name || "Unknown Name",
     subLabel: c.email
   }));
 
-  const contractOptions = availableContracts.map(c => ({
+  const contractOptions = availableContracts.map((c: any) => ({
     value: c.id,
     label: c.contract_number || "No Contract Number",
     subLabel: `Status: ${c.status}`
@@ -246,10 +255,6 @@ export default function CreateOrderDialog({
           <div>
             <div className="flex items-center justify-between mb-4">
               <Label>Order Items *</Label>
-              <Button type="button" onClick={addItem} size="sm" variant="outline">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Item
-              </Button>
             </div>
             
             <div className="space-y-4">
@@ -313,6 +318,13 @@ export default function CreateOrderDialog({
                   </div>
                 </div>
               ))}
+              
+              <div className="flex justify-end mt-4">
+                <Button type="button" onClick={addItem} size="sm" variant="outline">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Item
+                </Button>
+              </div>
             </div>
           </div>
 
