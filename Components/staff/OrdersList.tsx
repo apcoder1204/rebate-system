@@ -139,6 +139,11 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
                         {format(new Date(order.order_date), 'MMM d, yyyy')}
                       </p>
                     </div>
+                    {(['admin', 'manager'].includes(currentUserRole || '') || currentUserId === order.created_by) && (
+                      <p className="text-xs text-slate-500 mt-1">
+                        Created by: {order.creator_name || order.created_by || 'Unknown'}
+                      </p>
+                    )}
                   </div>
                 </div>
                 

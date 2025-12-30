@@ -36,29 +36,31 @@ export const listContracts = async (req: AuthRequest, res: Response) => {
       // Column check failed, assume it doesn't exist
     }
     
+    let selectFields = `
+      c.*,
+      u.full_name as customer_name,
+      u.email as customer_email,
+      u.phone as customer_phone
+    `;
+    if (hasApprovedByColumn) {
+      selectFields += `,
+      approver.full_name as approver_name`;
+    }
+    if (hasCreatedByColumn) {
+      selectFields += `,
+      creator.full_name as creator_name`;
+    }
+    
     let query = `
-      SELECT 
-        c.*,
-        u.full_name as customer_name,
-        u.email as customer_email,
-        u.phone as customer_phone
+      SELECT ${selectFields}
       FROM contracts c
       LEFT JOIN users u ON c.customer_id = u.id
     `;
-    
-    // Add approver join only if column exists
     if (hasApprovedByColumn) {
-      query = `
-        SELECT 
-          c.*,
-          u.full_name as customer_name,
-          u.email as customer_email,
-          u.phone as customer_phone,
-          approver.full_name as approver_name
-        FROM contracts c
-        LEFT JOIN users u ON c.customer_id = u.id
-        LEFT JOIN users approver ON c.approved_by = approver.id
-      `;
+      query += ` LEFT JOIN users approver ON c.approved_by = approver.id`;
+    }
+    if (hasCreatedByColumn) {
+      query += ` LEFT JOIN users creator ON c.created_by = creator.id`;
     }
     
     const params: any[] = [];
@@ -121,31 +123,33 @@ export const getContract = async (req: AuthRequest, res: Response) => {
       // Column check failed
     }
     
+    let getSelect = `
+      c.*,
+      u.full_name as customer_name,
+      u.email as customer_email,
+      u.phone as customer_phone
+    `;
+    if (hasApprovedByColumn) {
+      getSelect += `,
+      approver.full_name as approver_name`;
+    }
+    if (hasCreatedByColumn) {
+      getSelect += `,
+      creator.full_name as creator_name`;
+    }
+    
     let getQuery = `
-      SELECT 
-        c.*,
-        u.full_name as customer_name,
-        u.email as customer_email,
-        u.phone as customer_phone
+      SELECT ${getSelect}
       FROM contracts c
       LEFT JOIN users u ON c.customer_id = u.id
-      WHERE c.id = $1
     `;
-    
     if (hasApprovedByColumn) {
-      getQuery = `
-        SELECT 
-          c.*,
-          u.full_name as customer_name,
-          u.email as customer_email,
-          u.phone as customer_phone,
-          approver.full_name as approver_name
-        FROM contracts c
-        LEFT JOIN users u ON c.customer_id = u.id
-        LEFT JOIN users approver ON c.approved_by = approver.id
-        WHERE c.id = $1
-      `;
+      getQuery += ` LEFT JOIN users approver ON c.approved_by = approver.id`;
     }
+    if (hasCreatedByColumn) {
+      getQuery += ` LEFT JOIN users creator ON c.created_by = creator.id`;
+    }
+    getQuery += ` WHERE c.id = $1`;
     
     const result = await pool.query(getQuery, [id]);
     
@@ -486,31 +490,33 @@ export const filterContracts = async (req: AuthRequest, res: Response) => {
       // Column check failed
     }
     
+    let selectFields = `
+      c.*,
+      u.full_name as customer_name,
+      u.email as customer_email,
+      u.phone as customer_phone
+    `;
+    if (hasApprovedByColumn) {
+      selectFields += `,
+      approver.full_name as approver_name`;
+    }
+    if (hasCreatedByColumn) {
+      selectFields += `,
+      creator.full_name as creator_name`;
+    }
+    
     let query = `
-      SELECT 
-        c.*,
-        u.full_name as customer_name,
-        u.email as customer_email,
-        u.phone as customer_phone
+      SELECT ${selectFields}
       FROM contracts c
       LEFT JOIN users u ON c.customer_id = u.id
-      WHERE 1=1
     `;
-    
     if (hasApprovedByColumn) {
-      query = `
-        SELECT 
-          c.*,
-          u.full_name as customer_name,
-          u.email as customer_email,
-          u.phone as customer_phone,
-          approver.full_name as approver_name
-        FROM contracts c
-        LEFT JOIN users u ON c.customer_id = u.id
-        LEFT JOIN users approver ON c.approved_by = approver.id
-        WHERE 1=1
-      `;
+      query += ` LEFT JOIN users approver ON c.approved_by = approver.id`;
     }
+    if (hasCreatedByColumn) {
+      query += ` LEFT JOIN users creator ON c.created_by = creator.id`;
+    }
+    query += ` WHERE 1=1`;
     
     const params: any[] = [];
     let paramCount = 1;

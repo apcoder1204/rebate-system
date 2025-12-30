@@ -3,6 +3,7 @@ import { apiRequest } from "@/src/api/client";
 export type ContractType = {
   id: string;
   customer_id: string;
+  created_by?: string;
   customer_name?: string;
   customer_email?: string;
   customer_phone?: string;
@@ -18,6 +19,8 @@ export type ContractType = {
   manager_position?: string;
   approved_by?: string;
   approved_date?: string;
+  creator_name?: string;
+  approver_name?: string;
   created_date?: string;
   updated_date?: string;
 };

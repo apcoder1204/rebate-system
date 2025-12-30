@@ -75,10 +75,12 @@ export const getOrder = async (req: AuthRequest, res: Response) => {
         o.*,
         u.full_name as customer_name,
         u.email as customer_email,
-        c.contract_number
+        c.contract_number,
+        creator.full_name as creator_name
       FROM orders o
       LEFT JOIN users u ON o.customer_id = u.id
       LEFT JOIN contracts c ON o.contract_id = c.id
+      LEFT JOIN users creator ON o.created_by = creator.id
       WHERE o.id = $1`,
       [id]
     );
@@ -475,10 +477,12 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
         o.*,
         u.full_name as customer_name,
         u.email as customer_email,
-        c.contract_number
+        c.contract_number,
+        creator.full_name as creator_name
       FROM orders o
       LEFT JOIN users u ON o.customer_id = u.id
       LEFT JOIN contracts c ON o.contract_id = c.id
+      LEFT JOIN users creator ON o.created_by = creator.id
       WHERE 1=1
     `;
     

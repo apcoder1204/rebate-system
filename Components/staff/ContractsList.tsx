@@ -182,6 +182,16 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
                             <span>{contract.rebate_percentage}%</span>
                           </div>
                         )}
+                        {(['admin', 'manager', 'staff'].includes(currentUserRole || '') && contract.creator_name) && (
+                          <div className="flex items-center gap-1 truncate text-xs text-slate-500">
+                            <span>Created by: {contract.creator_name}</span>
+                          </div>
+                        )}
+                        {(['admin', 'manager'].includes(currentUserRole || '') && contract.approver_name) && (
+                          <div className="flex items-center gap-1 truncate text-xs text-green-600">
+                            <span>Approved by: {contract.approver_name}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

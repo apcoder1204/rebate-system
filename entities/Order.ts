@@ -11,6 +11,7 @@ export type OrderItem = {
 export type OrderType = {
   id: string;
   customer_id: string;
+  created_by?: string;
   contract_id?: string;
   order_number: string;
   order_date: string;
@@ -23,6 +24,7 @@ export type OrderType = {
   customer_name?: string;
   customer_email?: string;
   contract_number?: string;
+  creator_name?: string;
   created_date?: string;
   updated_date?: string;
   is_locked?: boolean;
