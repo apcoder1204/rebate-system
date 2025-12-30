@@ -13,7 +13,8 @@ router.post('/register', authRateLimit, userController.register);
 router.get('/me', authenticate, userController.getMe);
 router.put('/me', authenticate, userController.updateProfile);
 router.post('/change-password', authenticate, userController.changePassword);
-router.get('/list', authenticate, authorize('admin', 'manager'), userController.listUsers);
+// Allow staff to list users so they can filter customers in staff screens.
+router.get('/list', authenticate, authorize('admin', 'manager', 'staff'), userController.listUsers);
 
 // Phone-based verification endpoints (legacy - Twilio)
 router.post('/send-verification-code', passwordResetRateLimit, userController.sendVerificationCode);
