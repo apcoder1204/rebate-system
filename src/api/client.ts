@@ -52,6 +52,15 @@ export async function apiRequest(
   
   // Handle 401 Unauthorized (token expired/invalid)
   if (response.status === 401) {
+    const errorData = await response.json().catch(() => ({}));
+    
+    // If it's a login attempt (invalid credentials), throw specific error without clearing session yet
+    // The login page handles this error specifically
+    if (endpoint === '/auth/login' || endpoint.includes('/login')) {
+      throw new Error(errorData.error || 'Invalid credentials');
+    }
+
+    // For other 401s, it likely means the token expired
     // Clear session
     localStorage.removeItem(LS_KEY);
     localStorage.removeItem(TOKEN_KEY);
@@ -63,6 +72,11 @@ export async function apiRequest(
     }
     
     throw new Error('Session expired. Please login again.');
+  }
+
+  if (response.status === 429) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || errorData.message || 'Too many requests. Please try again later.');
   }
   
   if (!response.ok) {
@@ -101,6 +115,15 @@ export async function apiUpload(
   
   // Handle 401 Unauthorized (token expired/invalid)
   if (response.status === 401) {
+    const errorData = await response.json().catch(() => ({}));
+    
+    // If it's a login attempt (invalid credentials), throw specific error without clearing session yet
+    // The login page handles this error specifically
+    if (endpoint === '/auth/login' || endpoint.includes('/login')) {
+      throw new Error(errorData.error || 'Invalid credentials');
+    }
+
+    // For other 401s, it likely means the token expired
     // Clear session
     localStorage.removeItem(LS_KEY);
     localStorage.removeItem(TOKEN_KEY);
