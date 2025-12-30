@@ -123,6 +123,19 @@ export const getContract = async (req: AuthRequest, res: Response) => {
       // Column check failed
     }
     
+    // Check if created_by column exists
+    let hasCreatedByColumn = false;
+    try {
+      const columnCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name='contracts' AND column_name='created_by'
+      `);
+      hasCreatedByColumn = columnCheck.rows.length > 0;
+    } catch (e) {
+      // Column check failed
+    }
+    
     let getSelect = `
       c.*,
       u.full_name as customer_name,
