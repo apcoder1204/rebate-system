@@ -11,7 +11,12 @@ const APP_NAME = process.env.APP_NAME || 'RebateFlow';
 
 /**
  * Generate a random 6-digit verification code
- */
+now dont implement anything but i have couple of qns to ask you 
+1. is JWT_SECRET important and why?
+2.now what if i need to do ammends of some parts of System will my current data stay in place even if it requires some modification on db
+3.how do i get backup assuarance?
+4. wha i need to implement signup/signin with google? 
+*/
 function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
