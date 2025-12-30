@@ -170,7 +170,7 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
                       </div>
                     )}
                     <div className="flex items-center gap-2 ml-auto sm:ml-0">
-                      {((['admin', 'manager'].includes(currentUserRole || '') || (currentUserRole === 'staff' && order.created_by === currentUserId)) && order.customer_status !== 'confirmed') ? (
+                      {((['admin', 'manager'].includes(currentUserRole || '') || (currentUserRole === 'staff' && (order.created_by === currentUserId || isDisputed))) && order.customer_status !== 'confirmed') ? (
                          <Button
                           variant="outline"
                           size="sm"
