@@ -7,7 +7,8 @@ const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
 // Email sender configuration
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@cctvpoint.org';
-const APP_NAME = process.env.APP_NAME || 'RebateFlow';
+// Ensure APP_NAME is a clean name, not a URL
+const APP_NAME = process.env.APP_NAME || 'CCTV Point Rebate';
 
 /**
  * Generate a random 6-digit verification code
