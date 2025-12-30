@@ -11,19 +11,19 @@ import ContractsList from "@/Components/staff/ContractsList";
 import CreateContractDialog from "@/Components/staff/CreateContractDialog";
 
 export default function ManageContracts() {
-  const [contracts, setContracts] = useState([]);
-  const [customers, setCustomers] = useState([]);
+  const [contracts, setContracts] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingContract, setEditingContract] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentUserRole, setCurrentUserRole] = useState(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const loadData = useCallback(async () => {
     try {
       const user = await User.me();
       const userRole = user.role || 'user';
-      if (!['admin', 'manager'].includes(userRole)) {
+      if (!['admin', 'manager', 'staff'].includes(userRole)) {
         navigate(createPageUrl('Dashboard'));
         return;
       }
@@ -39,11 +39,11 @@ export default function ManageContracts() {
       navigate(createPageUrl('Home'));
     }
     setLoading(false);
-  }, [navigate]); // navigate is a dependency because it's used inside loadData
+  }, [navigate]);
 
   useEffect(() => {
     loadData();
-  }, [loadData]); // loadData is a dependency because it's called inside useEffect
+  }, [loadData]);
 
   if (loading) {
     return (
@@ -61,7 +61,7 @@ export default function ManageContracts() {
             <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-100 mb-2">Manage Contracts</h1>
             <p className="text-slate-600 dark:text-slate-400">Oversee all customer rebate contracts</p>
           </div>
-          {['admin', 'manager'].includes(currentUserRole) && (
+          {['admin', 'manager'].includes(currentUserRole || '') && (
             <Button
               onClick={() => setShowCreateDialog(true)}
               className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg shadow-blue-500/30"
@@ -75,7 +75,7 @@ export default function ManageContracts() {
         <ContractsList 
           contracts={contracts} 
           onRefresh={loadData}
-          currentUserRole={currentUserRole}
+          currentUserRole={currentUserRole || undefined}
           onEdit={(contract) => {
             setEditingContract(contract);
             setShowCreateDialog(true);
