@@ -65,7 +65,7 @@ const App = () => (
           <Route 
             path={routes.ManageContracts} 
             element={
-              <ProtectedRoute requiredRole={['admin', 'manager']}>
+              <ProtectedRoute requiredRole={['admin', 'manager', 'staff']}>
                 <Layout><ManageContracts /></Layout>
               </ProtectedRoute>
             } 

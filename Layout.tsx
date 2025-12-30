@@ -62,8 +62,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       items.push({ title: "Manage Orders", url: createPageUrl("ManageOrders" as any), icon: ShoppingCart });
     }
 
-    if (["admin", "manager"].includes(userRole)) {
+    if (["admin", "manager", "staff"].includes(userRole)) {
       items.push({ title: "Contracts", url: createPageUrl("ManageContracts" as any), icon: FileText });
+    }
+
+    if (["admin", "manager"].includes(userRole)) {
       items.push({ title: "Users", url: createPageUrl("ManageUsers" as any), icon: Users });
     }
 
