@@ -61,7 +61,7 @@ export default function ManageContracts() {
             <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-100 mb-2">Manage Contracts</h1>
             <p className="text-slate-600 dark:text-slate-400">Oversee all customer rebate contracts</p>
           </div>
-          {['admin', 'manager'].includes(currentUserRole || '') && (
+          {['admin', 'manager', 'staff'].includes(currentUserRole || '') && (
             <Button
               onClick={() => setShowCreateDialog(true)}
               className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg shadow-blue-500/30"

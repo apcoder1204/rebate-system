@@ -73,10 +73,7 @@ export default function ManageOrders() {
   }, [filterCustomerId, filterStatus, loadOrders]);
 
   const handleEdit = (order: any) => {
-    const isOwner = order.created_by === currentUserId;
-    const isDisputed = order.customer_status === 'disputed';
-    const canModify = ['admin', 'manager'].includes(currentUserRole || '') || 
-      (currentUserRole === 'staff' && (isOwner || isDisputed));
+    const canModify = ['admin', 'manager', 'staff'].includes(currentUserRole || '');
     const isConfirmed = order.customer_status === 'confirmed';
     
     setEditingOrder(order);
@@ -103,7 +100,7 @@ export default function ManageOrders() {
     );
   }
 
-    const canEdit = ['admin', 'manager'].includes(currentUserRole || '');
+    const canEdit = ['admin', 'manager', 'staff'].includes(currentUserRole || '');
 
   return (
     <div className="min-h-screen p-6 md:p-8 bg-slate-50 dark:bg-slate-900">

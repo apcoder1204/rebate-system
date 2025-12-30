@@ -273,14 +273,8 @@ export const updateOrder = async (req: AuthRequest, res: Response) => {
       if (order_date !== undefined || items !== undefined || total_amount !== undefined) {
         return res.status(403).json({ error: 'Users can only update status and comments' });
       }
-    } else {
-      // Admin/Manager/Staff logic
-      const isOwner = existingOrder.created_by === req.user!.id;
-      const canModify = ['admin', 'manager'].includes(req.user!.role) || (req.user!.role === 'staff' && isOwner);
-      
-      if (!canModify) {
-        return res.status(403).json({ error: 'Insufficient permissions to modify this order' });
-      }
+    } else if (!['admin', 'manager', 'staff'].includes(req.user!.role)) {
+      return res.status(403).json({ error: 'Insufficient permissions to modify this order' });
     }
     
     // Validate inputs

@@ -321,34 +321,9 @@ export const updateContract = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Invalid approver ID format' });
     }
     
-    // Check permissions
-    // Admins can modify anything
-    // Managers can only approve contracts (update manager fields and status)
-    if (req.user!.role !== 'admin') {
-      if (req.user!.role === 'manager') {
-        // Managers can only update approval-related fields
-        const allowedFields = ['status', 'manager_signature_data_url', 'manager_name', 'manager_position', 'approved_by'];
-        const requestedFields = Object.keys(req.body).filter(key => 
-          req.body[key] !== undefined && 
-          !['start_date', 'end_date', 'rebate_percentage', 'signed_contract_url'].includes(key)
-        );
-        
-        const hasUnauthorizedFields = requestedFields.some(field => !allowedFields.includes(field));
-        if (hasUnauthorizedFields) {
-          return res.status(403).json({ error: 'Managers can only approve contracts, not modify other fields' });
-        }
-        
-        // Only allow approval if contract is pending_approval
-        if (status && status !== 'approved' && status !== 'active' && status !== 'rejected') {
-          return res.status(403).json({ error: 'Managers can only approve, activate, or reject contracts' });
-        }
-        
-        if (contract.status !== 'pending_approval' && status && ['approved', 'active', 'rejected'].includes(status)) {
-          return res.status(403).json({ error: 'Can only approve contracts that are pending approval' });
-        }
-      } else {
-        return res.status(403).json({ error: 'Only admins and managers can modify contracts' });
-      }
+    // Check permissions: allow admin, manager, and staff to modify contracts
+    if (!['admin', 'manager', 'staff'].includes(req.user!.role)) {
+      return res.status(403).json({ error: 'Only admins, managers and staff can modify contracts' });
     }
     
     // Whitelist of allowed column names to prevent SQL injection
