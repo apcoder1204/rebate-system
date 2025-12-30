@@ -489,6 +489,9 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
     if (req.user!.role === 'user') {
       query += ` AND o.customer_id = $${paramCount++}`;
       params.push(req.user!.id);
+    } else if (req.user!.role === 'staff') {
+      query += ` AND o.created_by = $${paramCount++}`;
+      params.push(req.user!.id);
     } else if (customer_id) {
       // Validate customer_id format for admin/manager/staff
       if (!isValidUUID(customer_id as string)) {

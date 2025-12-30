@@ -48,7 +48,7 @@ export default function ManageOrders() {
       setCurrentUserRole(userRole);
       setCurrentUserId(user.id);
 
-      const allContracts = await Contract.list();
+      const allContracts = await Contract.list(undefined, { includeAll: true });
       const allUsers = await User.list();
       const customerUsers = allUsers.filter(u => !['admin', 'manager', 'staff'].includes(u.role || 'user')); 
       

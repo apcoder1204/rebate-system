@@ -23,8 +23,11 @@ export type ContractType = {
 };
 
 export const Contract = {
-  async list(sortBy?: string): Promise<ContractType[]> {
-    const query = sortBy ? `?sortBy=${sortBy}` : '';
+  async list(sortBy?: string, options?: { includeAll?: boolean }): Promise<ContractType[]> {
+    const params = new URLSearchParams();
+    if (sortBy) params.append('sortBy', sortBy);
+    if (options?.includeAll) params.append('include_all', 'true');
+    const query = params.toString() ? `?${params.toString()}` : '';
     return apiRequest(`/contracts${query}`);
   },
   async create(data: Partial<ContractType>): Promise<ContractType> {

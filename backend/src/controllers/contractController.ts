@@ -23,6 +23,19 @@ export const listContracts = async (req: AuthRequest, res: Response) => {
       // Column check failed, assume it doesn't exist
     }
     
+    // Check if created_by column exists before using it
+    let hasCreatedByColumn = false;
+    try {
+      const columnCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name='contracts' AND column_name='created_by'
+      `);
+      hasCreatedByColumn = columnCheck.rows.length > 0;
+    } catch (e) {
+      // Column check failed, assume it doesn't exist
+    }
+    
     let query = `
       SELECT 
         c.*,
@@ -49,11 +62,25 @@ export const listContracts = async (req: AuthRequest, res: Response) => {
     }
     
     const params: any[] = [];
+    let hasWhere = false;
     
     // Apply role-based filtering
     if (req.user!.role === 'user') {
       query += ' WHERE c.customer_id = $1';
       params.push(req.user!.id);
+      hasWhere = true;
+    } else if (req.user!.role === 'staff' && req.query.include_all !== 'true') {
+      const clauses: string[] = [];
+      if (hasCreatedByColumn) {
+        clauses.push(`c.created_by = $${params.length + 1}`);
+        params.push(req.user!.id);
+      }
+      clauses.push(`c.approved_by = $${params.length + 1}`);
+      params.push(req.user!.id);
+      if (clauses.length > 0) {
+        query += ` WHERE ${clauses.join(' OR ')}`;
+        hasWhere = true;
+      }
     }
     
     // Safe sort by (whitelisted)
@@ -446,6 +473,19 @@ export const filterContracts = async (req: AuthRequest, res: Response) => {
       // Column check failed
     }
     
+    // Check if created_by column exists
+    let hasCreatedByColumn = false;
+    try {
+      const columnCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name='contracts' AND column_name='created_by'
+      `);
+      hasCreatedByColumn = columnCheck.rows.length > 0;
+    } catch (e) {
+      // Column check failed
+    }
+    
     let query = `
       SELECT 
         c.*,
@@ -479,6 +519,15 @@ export const filterContracts = async (req: AuthRequest, res: Response) => {
     if (req.user!.role === 'user') {
       query += ` AND c.customer_id = $${paramCount++}`;
       params.push(req.user!.id);
+    } else if (req.user!.role === 'staff') {
+      const clauses: string[] = [];
+      if (hasCreatedByColumn) {
+        clauses.push(`c.created_by = $${paramCount++}`);
+        params.push(req.user!.id);
+      }
+      clauses.push(`c.approved_by = $${paramCount++}`);
+      params.push(req.user!.id);
+      query += ` AND (${clauses.join(' OR ')})`;
     } else if (customer_id) {
       // Validate customer_id format for admin/manager/staff
       if (!isValidUUID(customer_id as string)) {
