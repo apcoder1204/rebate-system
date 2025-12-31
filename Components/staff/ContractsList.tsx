@@ -25,8 +25,8 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
   const [approvalContract, setApprovalContract] = useState<any>(null);
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const canModify = ['admin', 'manager', 'staff'].includes(currentUserRole || '');
   const canApprove = ['admin', 'manager', 'staff'].includes(currentUserRole || '');
+  const canModify = ['admin', 'manager'].includes(currentUserRole || '');
 
   // Load current user for approval
   React.useEffect(() => {
