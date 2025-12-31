@@ -73,11 +73,15 @@ export default function ManageOrders() {
   }, [filterCustomerId, filterStatus, loadOrders]);
 
   const handleEdit = (order: any) => {
-    const canModify = ['admin', 'manager', 'staff'].includes(currentUserRole || '');
+    const isOwner = order.created_by === currentUserId;
+    const isDisputed = order.customer_status === 'disputed';
     const isConfirmed = order.customer_status === 'confirmed';
-    
+    const canModify =
+      ['admin', 'manager'].includes(currentUserRole || '') ||
+      (currentUserRole === 'staff' && (isOwner || isDisputed));
+
     setEditingOrder(order);
-    
+
     if (canModify && !isConfirmed) {
       setShowCreateDialog(true);
     } else {

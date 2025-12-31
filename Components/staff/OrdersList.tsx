@@ -231,7 +231,9 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
                       >
                         <Download className="w-4 h-4" />
                       </Button>
-                      {(['admin', 'manager', 'staff'].includes(currentUserRole || '') && order.customer_status !== 'confirmed') ? (
+                      {((['admin', 'manager'].includes(currentUserRole || '')) ||
+                        (currentUserRole === 'staff' && (order.created_by === currentUserId || isDisputed))) &&
+                        order.customer_status !== 'confirmed' ? (
                          <Button
                           variant="outline"
                           size="sm"
