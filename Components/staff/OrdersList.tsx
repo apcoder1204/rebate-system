@@ -4,9 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/Components/ui/card";
 import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
 import { Badge } from "@/Components/ui/badge";
-import { Search, Edit, Trash2, ShoppingCart, Calendar, DollarSign, Package, Eye, Lock, Unlock, AlertCircle } from "lucide-react";
+import { Search, Edit, Trash2, ShoppingCart, Calendar, DollarSign, Package, Eye, Lock, Unlock, AlertCircle, Download } from "lucide-react";
 import { format, addMonths, isAfter, differenceInDays } from "date-fns";
 import { useToast } from "@/Context/ToastContext";
+import jsPDF from "jspdf";
 
 interface OrdersListProps {
   orders: any[];
@@ -20,6 +21,34 @@ interface OrdersListProps {
 export default function OrdersList({ orders, onRefresh, onEdit, canEdit, currentUserRole, currentUserId }: OrdersListProps) {
   const { showSuccess, showError, showWarning } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+
+  const handleDownload = (order: any) => {
+    const doc = new jsPDF();
+    const lineHeight = 8;
+    let y = 20;
+
+    const addLine = (text: string) => {
+      doc.text(String(text), 14, y);
+      y += lineHeight;
+    };
+
+    addLine(`Order Number: ${order.order_number || order.id}`);
+    addLine(`Status: ${(order.customer_status || "unknown").toUpperCase()}`);
+    addLine(`Order Date: ${order.order_date ? new Date(order.order_date).toLocaleDateString() : "N/A"}`);
+    addLine(`Customer: ${order.customer_name || order.customer_id || "N/A"}`);
+    addLine(`Total Amount: Tsh ${parseFloat(String(order.total_amount || 0)).toFixed(2)}`);
+    addLine(`Rebate Amount: Tsh ${parseFloat(String(order.rebate_amount || 0)).toFixed(2)}`);
+    addLine(`Items:`);
+
+    (order.items || []).forEach((item: any, index: number) => {
+      addLine(
+        `${index + 1}. ${item.product_name || "Item"} - Qty: ${item.quantity || 0}, Unit: ${item.unit_price || 0}, Total: ${item.total_price || 0}`
+      );
+    });
+
+    const filename = `${order.order_number || "order"}.pdf`;
+    doc.save(filename);
+  };
 
   const filteredOrders = orders.filter((order: any) =>
     order.order_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -175,6 +204,15 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
                       </div>
                     )}
                     <div className="flex items-center gap-2 ml-auto sm:ml-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownload(order)}
+                        className="p-2"
+                        title="Download PDF"
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
                       {(['admin', 'manager', 'staff'].includes(currentUserRole || '') && order.customer_status !== 'confirmed') ? (
                          <Button
                           variant="outline"
