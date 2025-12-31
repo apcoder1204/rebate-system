@@ -22,10 +22,17 @@ export const securityHeaders = helmet({
  */
 export const authRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 5 : 20, // More lenient in development
+  // Allow more room overall, but only count failed attempts
+  max: process.env.NODE_ENV === 'production' ? 50 : 200,
   message: 'Too many authentication attempts, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  // Only count failed logins (4xx/5xx). Successful logins are skipped.
+  skipSuccessfulRequests: true,
+  keyGenerator: (req) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email.toLowerCase() : '';
+    return `${req.ip}:${email}`;
+  },
   skip: (req) => {
     // Skip rate limiting for localhost in development
     return process.env.NODE_ENV !== 'production' && req.ip === '::1';

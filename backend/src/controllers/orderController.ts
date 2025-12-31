@@ -276,7 +276,7 @@ export const updateOrder = async (req: AuthRequest, res: Response) => {
         return res.status(403).json({ error: 'Users can only update status and comments' });
       }
     } else if (!['admin', 'manager', 'staff'].includes(req.user!.role)) {
-      return res.status(403).json({ error: 'Insufficient permissions to modify this order' });
+        return res.status(403).json({ error: 'Insufficient permissions to modify this order' });
     }
     
     // Validate inputs
