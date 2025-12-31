@@ -24,27 +24,45 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
 
   const handleDownload = (order: any) => {
     const doc = new jsPDF();
-    const lineHeight = 8;
-    let y = 20;
 
-    const addLine = (text: string) => {
-      doc.text(String(text), 14, y);
-      y += lineHeight;
-    };
+    // Header
+    doc.setFontSize(14);
+    doc.text(`Order ${order.order_number || order.id || ""}`, 14, 16);
+    doc.setFontSize(10);
+    doc.text(`Status: ${(order.customer_status || "unknown").toUpperCase()}`, 14, 22);
+    doc.text(`Date: ${order.order_date ? new Date(order.order_date).toLocaleDateString() : "N/A"}`, 100, 22);
+    doc.text(`Customer: ${order.customer_name || order.customer_id || "N/A"}`, 14, 28);
 
-    addLine(`Order Number: ${order.order_number || order.id}`);
-    addLine(`Status: ${(order.customer_status || "unknown").toUpperCase()}`);
-    addLine(`Order Date: ${order.order_date ? new Date(order.order_date).toLocaleDateString() : "N/A"}`);
-    addLine(`Customer: ${order.customer_name || order.customer_id || "N/A"}`);
-    addLine(`Total Amount: Tsh ${parseFloat(String(order.total_amount || 0)).toFixed(2)}`);
-    addLine(`Rebate Amount: Tsh ${parseFloat(String(order.rebate_amount || 0)).toFixed(2)}`);
-    addLine(`Items:`);
+    // Table layout
+    const startY = 38;
+    const colX = [14, 30, 110, 140, 170]; // Item, Description, Qty, Unit, Total
+    const rowHeight = 10;
 
-    (order.items || []).forEach((item: any, index: number) => {
-      addLine(
-        `${index + 1}. ${item.product_name || "Item"} - Qty: ${item.quantity || 0}, Unit: ${item.unit_price || 0}, Total: ${item.total_price || 0}`
-      );
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Item", colX[0], startY);
+    doc.text("Itemdescription", colX[1], startY);
+    doc.text("QTY", colX[2], startY);
+    doc.text("Unit price", colX[3], startY);
+    doc.text("AmountTotal", colX[4], startY);
+
+    doc.setFont("helvetica", "normal");
+    const items = order.items || [];
+    let y = startY + rowHeight;
+    items.forEach((item: any, index: number) => {
+      doc.text(String(index + 1), colX[0], y);
+      doc.text(String(item.product_name || "Item"), colX[1], y);
+      doc.text(String(item.quantity ?? 0), colX[2], y, { align: "right" });
+      doc.text(`${parseFloat(String(item.unit_price || 0)).toLocaleString()}`, colX[3], y, { align: "right" });
+      doc.text(`${parseFloat(String(item.total_price || 0)).toLocaleString()}`, colX[4], y, { align: "right" });
+      y += rowHeight;
     });
+
+    // Totals row
+    const totalAmount = parseFloat(String(order.total_amount || 0));
+    doc.setFont("helvetica", "bold");
+    doc.text("TOTAL", colX[3], y);
+    doc.text(`${totalAmount.toLocaleString()}`, colX[4], y, { align: "right" });
 
     const filename = `${order.order_number || "order"}.pdf`;
     doc.save(filename);
