@@ -85,7 +85,7 @@ export function isValidRole(role: string): boolean {
  * Validate order status
  */
 export function isValidOrderStatus(status: string): boolean {
-  return ['pending', 'confirmed', 'cancelled'].includes(status);
+  return ['pending', 'confirmed', 'disputed', 'cancelled'].includes(status);
 }
 
 /**
