@@ -73,7 +73,7 @@ export const listContracts = async (req: AuthRequest, res: Response) => {
       hasWhere = true;
     } else if (req.user!.role === 'staff' && req.query.include_all !== 'true') {
       const clauses: string[] = [];
-      clauses.push(`c.status = 'pending_approval'`);
+      clauses.push(`c.status IN ('pending', 'pending_approval')`);
       clauses.push(`c.approved_by = $${params.length + 1}`);
       params.push(req.user!.id);
       query += ` WHERE (${clauses.join(' OR ')})`;
@@ -535,7 +535,7 @@ export const filterContracts = async (req: AuthRequest, res: Response) => {
       params.push(req.user!.id);
     } else if (req.user!.role === 'staff') {
       const clauses: string[] = [];
-      clauses.push(`c.status = 'pending_approval'`);
+      clauses.push(`c.status IN ('pending', 'pending_approval')`);
       clauses.push(`c.approved_by = $${paramCount++}`);
       params.push(req.user!.id);
       query += ` AND (${clauses.join(' OR ')})`;
