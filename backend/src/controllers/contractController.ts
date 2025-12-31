@@ -73,16 +73,11 @@ export const listContracts = async (req: AuthRequest, res: Response) => {
       hasWhere = true;
     } else if (req.user!.role === 'staff' && req.query.include_all !== 'true') {
       const clauses: string[] = [];
-      if (hasCreatedByColumn) {
-        clauses.push(`c.created_by = $${params.length + 1}`);
-        params.push(req.user!.id);
-      }
+      clauses.push(`c.status = 'pending_approval'`);
       clauses.push(`c.approved_by = $${params.length + 1}`);
       params.push(req.user!.id);
-      if (clauses.length > 0) {
-        query += ` WHERE ${clauses.join(' OR ')}`;
-        hasWhere = true;
-      }
+      query += ` WHERE (${clauses.join(' OR ')})`;
+      hasWhere = true;
     }
     
     // Safe sort by (whitelisted)
@@ -540,10 +535,7 @@ export const filterContracts = async (req: AuthRequest, res: Response) => {
       params.push(req.user!.id);
     } else if (req.user!.role === 'staff') {
       const clauses: string[] = [];
-      if (hasCreatedByColumn) {
-        clauses.push(`c.created_by = $${paramCount++}`);
-        params.push(req.user!.id);
-      }
+      clauses.push(`c.status = 'pending_approval'`);
       clauses.push(`c.approved_by = $${paramCount++}`);
       params.push(req.user!.id);
       query += ` AND (${clauses.join(' OR ')})`;
