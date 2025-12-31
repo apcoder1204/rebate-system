@@ -33,18 +33,19 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
     doc.text(`Date: ${order.order_date ? new Date(order.order_date).toLocaleDateString() : "N/A"}`, 100, 22);
     doc.text(`Customer: ${order.customer_name || order.customer_id || "N/A"}`, 14, 28);
 
-    // Table layout
+    // Table layout - refined column positions for better alignment
     const startY = 38;
-    const colX = [14, 30, 110, 140, 170]; // Item, Description, Qty, Unit, Total
+    // Item (narrow), Description (wide), QTY (right-aligned), Unit price (right-aligned), AmountTotal (right-aligned)
+    const colX = [14, 25, 130, 155, 185]; 
     const rowHeight = 10;
 
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.text("Item", colX[0], startY);
     doc.text("Itemdescription", colX[1], startY);
-    doc.text("QTY", colX[2], startY);
-    doc.text("Unit price", colX[3], startY);
-    doc.text("AmountTotal", colX[4], startY);
+    doc.text("QTY", colX[2], startY, { align: "right" });
+    doc.text("Unit price", colX[3], startY, { align: "right" });
+    doc.text("AmountTotal", colX[4], startY, { align: "right" });
 
     doc.setFont("helvetica", "normal");
     const items = order.items || [];
@@ -58,10 +59,10 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
       y += rowHeight;
     });
 
-    // Totals row
+    // Totals row - right-aligned
     const totalAmount = parseFloat(String(order.total_amount || 0));
     doc.setFont("helvetica", "bold");
-    doc.text("TOTAL", colX[3], y);
+    doc.text("TOTAL", colX[3], y, { align: "right" });
     doc.text(`${totalAmount.toLocaleString()}`, colX[4], y, { align: "right" });
 
     const filename = `${order.order_number || "order"}.pdf`;
