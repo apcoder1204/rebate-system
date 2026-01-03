@@ -41,8 +41,7 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
     try {
       await Order.update(order.id, {
         customer_status: status,
-        customer_comment: comment || null,
-        customer_confirmed_date: new Date().toISOString()
+        customer_comment: comment || null
       });
       
       // If disputed, notify staff/admin/manager (this will be handled on backend)
