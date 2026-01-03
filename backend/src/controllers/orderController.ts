@@ -295,10 +295,10 @@ export const updateOrder = async (req: AuthRequest, res: Response) => {
     }
     
     if (customer_comment !== undefined) {
-      if (typeof customer_comment !== 'string') {
-        return res.status(400).json({ error: 'Comment must be a string' });
+      if (customer_comment !== null && typeof customer_comment !== 'string') {
+        return res.status(400).json({ error: 'Comment must be a string or null' });
       }
-      if (customer_comment.length > 1000) {
+      if (customer_comment !== null && customer_comment.length > 1000) {
         return res.status(400).json({ error: 'Comment too long. Maximum 1000 characters' });
       }
     }
