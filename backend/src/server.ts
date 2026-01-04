@@ -14,6 +14,14 @@ const PORT = process.env.PORT || 3000;
 // Security middleware (must be first)
 app.use(securityHeaders);
 
+// Prevent caching of API responses
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
 // CORS configuration
 const allowedOrigins = [
   'https://rebate.cctvpoint.org', // Production Frontend

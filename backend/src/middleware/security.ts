@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import jwt from 'jsonwebtoken';
 
 /**
  * Security headers middleware
@@ -41,13 +42,33 @@ export const authRateLimit = rateLimit({
 
 /**
  * Rate limiting for general API endpoints
+ * Uses user ID from JWT token for per-user rate limiting instead of IP-based
  */
 export const apiRateLimit = rateLimit({
   windowMs: 150 * 60 * 1000, // 150 minutes
-  max: 500, // Limit each IP to 500 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
+  max: 500, // Limit each user to 500 requests per windowMs
+  message: 'Too many requests, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => {
+    // Use user ID from token if authenticated, otherwise fall back to IP
+    const token = req.headers.authorization?.split(' ')[1];
+    if (token) {
+      try {
+        const jwtSecret = process.env.JWT_SECRET;
+        if (jwtSecret && jwtSecret !== 'your-secret-key') {
+          const decoded = jwt.verify(token, jwtSecret) as any;
+          if (decoded?.id) {
+            return decoded.id; // Per-user rate limiting
+          }
+        }
+      } catch {
+        // Invalid token, fall back to IP
+      }
+    }
+    return req.ip; // Fall back to IP for unauthenticated requests
+  },
+  skipSuccessfulRequests: false, // Count all requests
 });
 
 /**

@@ -38,6 +38,8 @@ export async function apiRequest(
   
   const headers: any = {
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
     ...options.headers,
   };
   
@@ -45,9 +47,17 @@ export async function apiRequest(
     headers['Authorization'] = `Bearer ${token}`;
   }
   
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  // Add cache-busting for GET requests
+  let requestUrl = `${API_BASE_URL}${endpoint}`;
+  if (!options.method || options.method === 'GET') {
+    const separator = endpoint.includes('?') ? '&' : '?';
+    requestUrl = `${requestUrl}${separator}_t=${Date.now()}`;
+  }
+  
+  const response = await fetch(requestUrl, {
     ...options,
     headers,
+    cache: 'no-store', // Prevent browser caching
   });
   
   // Handle 401 Unauthorized (token expired/invalid)
@@ -76,7 +86,8 @@ export async function apiRequest(
 
   if (response.status === 429) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || errorData.message || 'Too many requests. Please try again later.');
+    // Don't clear session or redirect - just show error message
+    throw new Error(errorData.error || errorData.message || 'Too many requests. Please wait a moment and try again.');
   }
   
   if (!response.ok) {
@@ -102,7 +113,10 @@ export async function apiUpload(
   const formData = new FormData();
   formData.append('file', file);
   
-  const headers: HeadersInit = {};
+  const headers: HeadersInit = {
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+  };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -111,6 +125,7 @@ export async function apiUpload(
     method: 'POST',
     headers,
     body: formData,
+    cache: 'no-store', // Prevent browser caching
   });
   
   // Handle 401 Unauthorized (token expired/invalid)
