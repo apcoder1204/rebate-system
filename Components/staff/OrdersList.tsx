@@ -161,7 +161,8 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
           <div className="space-y-4">
             {sortedOrders.map((order: any) => {
               const isDisputed = order.customer_status === 'disputed';
-              const isLocked = order.is_locked || (order.customer_status === 'pending' && differenceInDays(new Date(), new Date(order.order_date)) >= 3);
+              // Use backend status for locking
+              const isLocked = !!order.is_locked;
               const daysSinceOrder = differenceInDays(new Date(), new Date(order.order_date));
               
               return (

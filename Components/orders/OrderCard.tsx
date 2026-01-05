@@ -28,7 +28,8 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
   const daysSinceOrder = differenceInDays(new Date(), orderDate);
   const lockDeadline = addDays(orderDate, 3);
   const daysUntilLock = differenceInDays(lockDeadline, new Date());
-  const isLocked = order.is_locked || (order.customer_status === 'pending' && daysSinceOrder >= 3);
+  // Use backend status for locking
+  const isLocked = !!order.is_locked;
   const shouldShowReminder = order.customer_status === 'pending' && !isLocked && daysUntilLock <= 3 && daysUntilLock > 0;
 
   const handleConfirm = async (status: 'confirmed' | 'disputed') => {

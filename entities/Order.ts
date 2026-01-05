@@ -29,6 +29,7 @@ export type OrderType = {
   updated_date?: string;
   is_locked?: boolean;
   locked_date?: string;
+  manually_unlocked?: boolean;
 };
 
 export const Order = {

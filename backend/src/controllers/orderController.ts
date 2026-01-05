@@ -11,6 +11,16 @@ export const listOrders = async (req: AuthRequest, res: Response) => {
       'order_date'
     );
     
+    // Check for auto-locking orders before listing
+    await pool.query(`
+      UPDATE orders
+      SET is_locked = TRUE, locked_date = NOW()
+      WHERE customer_status = 'pending'
+        AND order_date < NOW() - INTERVAL '3 days'
+        AND is_locked = FALSE
+        AND manually_unlocked = FALSE
+    `);
+
     let query = `
       SELECT 
         o.*,
@@ -69,6 +79,17 @@ export const getOrder = async (req: AuthRequest, res: Response) => {
     if (!isValidUUID(id)) {
       return res.status(400).json({ error: 'Invalid order ID format' });
     }
+
+    // Check for auto-locking this specific order
+    await pool.query(`
+      UPDATE orders
+      SET is_locked = TRUE, locked_date = NOW()
+      WHERE id = $1
+        AND customer_status = 'pending'
+        AND order_date < NOW() - INTERVAL '3 days'
+        AND is_locked = FALSE
+        AND manually_unlocked = FALSE
+    `, [id]);
     
     const result = await pool.query(
       `SELECT 
@@ -251,7 +272,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
 export const updateOrder = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { order_date, items, total_amount, customer_status, customer_comment } = req.body;
+    const { order_date, items, total_amount, customer_status, customer_comment, is_locked } = req.body;
     
     // Validate ID format
     if (!isValidUUID(id)) {
@@ -350,7 +371,7 @@ export const updateOrder = async (req: AuthRequest, res: Response) => {
       let paramCount = 1;
       
       // Whitelist of allowed column names
-      const allowedColumns = ['order_date', 'total_amount', 'rebate_amount', 'customer_status', 'customer_comment', 'customer_confirmed_date'];
+      const allowedColumns = ['order_date', 'total_amount', 'rebate_amount', 'customer_status', 'customer_comment', 'customer_confirmed_date', 'is_locked', 'locked_date', 'manually_unlocked'];
       
       if (order_date !== undefined) {
         updates.push(`order_date = $${paramCount++}`);
@@ -373,6 +394,26 @@ export const updateOrder = async (req: AuthRequest, res: Response) => {
           values.push(new Date().toISOString());
         }
       }
+
+      // Handle locking/unlocking logic
+      if (is_locked !== undefined && ['admin', 'manager'].includes(req.user!.role)) {
+        updates.push(`is_locked = $${paramCount++}`);
+        values.push(is_locked);
+
+        if (is_locked === false) {
+          // If unlocking, clear locked_date and set manually_unlocked to prevent auto-relock
+          updates.push(`locked_date = $${paramCount++}`);
+          values.push(null);
+          
+          updates.push(`manually_unlocked = $${paramCount++}`);
+          values.push(true);
+        } else if (is_locked === true) {
+          // If manually locking
+          updates.push(`locked_date = $${paramCount++}`);
+          values.push(new Date().toISOString());
+        }
+      }
+
       if (customer_comment !== undefined) {
         const sanitizedComment = sanitizeString(customer_comment).substring(0, 1000);
         updates.push(`customer_comment = $${paramCount++}`);
@@ -478,6 +519,16 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
       'order_date'
     );
     
+    // Check for auto-locking orders before filtering
+    await pool.query(`
+      UPDATE orders
+      SET is_locked = TRUE, locked_date = NOW()
+      WHERE customer_status = 'pending'
+        AND order_date < NOW() - INTERVAL '3 days'
+        AND is_locked = FALSE
+        AND manually_unlocked = FALSE
+    `);
+
     let query = `
       SELECT 
         o.*,

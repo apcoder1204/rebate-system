@@ -126,10 +126,7 @@ export default function ManageOrders() {
         {/* Notification Banner for Disputed Orders */}
         {(() => {
           const disputedOrders = orders.filter((o: any) => o.customer_status === 'disputed');
-          const lockedOrders = orders.filter((o: any) => {
-            const daysSinceOrder = Math.floor((new Date().getTime() - new Date(o.order_date).getTime()) / (1000 * 60 * 60 * 24));
-            return o.is_locked || (o.customer_status === 'pending' && daysSinceOrder >= 3);
-          });
+          const lockedOrders = orders.filter((o: any) => !!o.is_locked);
           
           if (disputedOrders.length > 0 || lockedOrders.length > 0) {
             return (
