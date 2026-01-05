@@ -27,7 +27,7 @@ export const login = async (req: Request, res: Response) => {
     }
     
     const result = await pool.query(
-      'SELECT id, email, password_hash, full_name, role, phone, created_date FROM users WHERE email = $1',
+      'SELECT id, email, password_hash, full_name, role, phone, created_date, is_active FROM users WHERE email = $1',
       [sanitizedEmail]
     );
     
@@ -37,6 +37,13 @@ export const login = async (req: Request, res: Response) => {
     }
     
     const user = result.rows[0];
+
+    // Check if account is active
+    if (user.is_active === false) {
+      console.log(`Login attempt failed: Inactive account for email: ${sanitizedEmail}`);
+      return res.status(403).json({ error: 'Account is inactive. Please contact support.' });
+    }
+
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     
     if (!isValidPassword) {
@@ -151,10 +158,10 @@ export const register = async (req: Request, res: Response) => {
     
     // Always create user with 'user' role initially
     const result = await pool.query(
-      `INSERT INTO users (email, password_hash, full_name, phone, role, phone_verified, email_verified) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7) 
-       RETURNING id, email, full_name, role, phone, created_date`,
-      [sanitizedEmail, hashedPassword, sanitizedFullName, formattedPhone, 'user', true, true]
+      `INSERT INTO users (email, password_hash, full_name, phone, role, phone_verified, email_verified, is_active) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+       RETURNING id, email, full_name, role, phone, created_date, is_active`,
+      [sanitizedEmail, hashedPassword, sanitizedFullName, formattedPhone, 'user', true, true, true]
     );
     
     const user = result.rows[0];
@@ -317,7 +324,7 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
 export const listUsers = async (req: AuthRequest, res: Response) => {
   try {
     const result = await pool.query(
-      'SELECT id, email, full_name, role, phone, created_date FROM users ORDER BY created_date DESC'
+      'SELECT id, email, full_name, role, phone, created_date, is_active FROM users ORDER BY created_date DESC'
     );
     
     res.json(result.rows);
