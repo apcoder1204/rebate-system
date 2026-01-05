@@ -148,15 +148,15 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       if (typeof item.quantity !== 'number' || item.quantity <= 0 || item.quantity > 10000) {
         return res.status(400).json({ error: 'Invalid quantity. Must be between 1 and 10000' });
       }
-      if (typeof item.unit_price !== 'number' || item.unit_price < 0 || item.unit_price > 1000000) {
-        return res.status(400).json({ error: 'Invalid unit price. Must be between 0 and 1000000' });
+      if (typeof item.unit_price !== 'number' || item.unit_price < 0 || item.unit_price > 20000000) {
+        return res.status(400).json({ error: 'Invalid unit price. Must be between 0 and 20000000' });
       }
       item.product_name = sanitizeString(item.product_name).substring(0, 200);
     }
     
     // Validate total_amount if provided
     if (total_amount !== undefined) {
-      const sanitizedTotal = sanitizeNumber(total_amount, 0, 10000000);
+      const sanitizedTotal = sanitizeNumber(total_amount, 0, 20000000);
       if (sanitizedTotal === null) {
         return res.status(400).json({ error: 'Invalid total amount' });
       }
@@ -181,7 +181,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       await client.query('BEGIN');
       
       // Calculate total amount if not provided
-      let calculatedTotal = total_amount ? sanitizeNumber(total_amount, 0, 10000000)! : 0;
+      let calculatedTotal = total_amount ? sanitizeNumber(total_amount, 0, 20000000)! : 0;
       if (!total_amount) {
         calculatedTotal = items.reduce((sum: number, item: any) => {
           return sum + (item.quantity * item.unit_price);
@@ -304,7 +304,7 @@ export const updateOrder = async (req: AuthRequest, res: Response) => {
     }
     
     if (total_amount !== undefined) {
-      const sanitizedTotal = sanitizeNumber(total_amount, 0, 10000000);
+      const sanitizedTotal = sanitizeNumber(total_amount, 0, 20000000);
       if (sanitizedTotal === null) {
         return res.status(400).json({ error: 'Invalid total amount' });
       }
@@ -326,7 +326,7 @@ export const updateOrder = async (req: AuthRequest, res: Response) => {
         if (typeof item.quantity !== 'number' || item.quantity <= 0 || item.quantity > 10000) {
           return res.status(400).json({ error: 'Invalid quantity' });
         }
-        if (typeof item.unit_price !== 'number' || item.unit_price < 0 || item.unit_price > 1000000) {
+        if (typeof item.unit_price !== 'number' || item.unit_price < 0 || item.unit_price > 20000000) {
           return res.status(400).json({ error: 'Invalid unit price' });
         }
       }
@@ -357,7 +357,7 @@ export const updateOrder = async (req: AuthRequest, res: Response) => {
         values.push(order_date);
       }
       if (total_amount !== undefined) {
-        const sanitizedTotal = sanitizeNumber(total_amount, 0, 10000000)!;
+        const sanitizedTotal = sanitizeNumber(total_amount, 0, 20000000)!;
         updates.push(`total_amount = $${paramCount++}`);
         values.push(sanitizedTotal);
         // Recalculate rebate amount (1% default)
