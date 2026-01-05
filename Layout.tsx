@@ -70,9 +70,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       items.push({ title: "Users", url: createPageUrl("ManageUsers" as any), icon: Users });
     }
 
+    if (userRole === 'admin') {
+      items.push({ title: "System", url: "/admin/system-settings", icon: Settings });
+    }
+
     // Settings available for all authenticated users
     items.push({ title: "Settings", url: createPageUrl("Settings" as any), icon: Settings });
-
+    
     return items;
   };
 

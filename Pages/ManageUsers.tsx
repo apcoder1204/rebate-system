@@ -152,6 +152,39 @@ export default function ManageUsers() {
     setDeletingUserId(null);
   };
 
+  const handleToggleActive = async (userId: string, currentStatus: boolean) => {
+    if (!isAdmin) {
+      setError('Only admins can change user active status');
+      return;
+    }
+
+    if (userId === currentUser?.id) {
+      setError('You cannot deactivate your own account');
+      return;
+    }
+
+    const userToToggle = users.find(u => u.id === userId);
+    if (userToToggle?.role === 'admin' && !currentStatus === false) { // If deactivating
+      // Check active admins
+      const activeAdmins = users.filter(u => u.role === 'admin' && (u.is_active ?? true)).length;
+      if (activeAdmins <= 1) {
+        setError('Cannot deactivate the last active admin.');
+        return;
+      }
+    }
+
+    setTogglingActive(userId);
+    setError(null);
+    try {
+      await Admin.toggleUserActive(userId, !currentStatus);
+      await loadData();
+      showSuccess(`User ${!currentStatus ? 'activated' : 'deactivated'} successfully`);
+    } catch (error: any) {
+      setError(error.message || 'Failed to update user status');
+    }
+    setTogglingActive(null);
+  };
+
   const getRoleStats = () => {
     const admins = users.filter(u => u.role === 'admin').length;
     const managers = users.filter(u => u.role === 'manager').length;
@@ -290,25 +323,34 @@ export default function ManageUsers() {
                   const canChangeRole = isAdmin && !isLastAdmin; // Only show button if not last admin
                   const isEditing = editingRole?.userId === user.id;
                   const canDelete = isAdmin && user.id !== currentUser?.id && !(userRole === 'admin' && stats.admins === 1);
+                  const isActive = user.is_active ?? true;
                   
                   return (
                     <div
                       key={user.id}
-                      className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors gap-4"
+                      className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors gap-4 ${!isActive ? 'bg-slate-100 opacity-75' : ''}`}
                     >
                       <div className="flex items-center gap-4 w-full md:w-auto">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center flex-shrink-0">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${!isActive ? 'bg-slate-400' : 'bg-gradient-to-br from-blue-500 to-blue-700'}`}>
                           <span className="text-white font-semibold">
                             {user.full_name?.charAt(0) || 'U'}
                           </span>
                         </div>
                         <div className="min-w-0">
-                          <p className="font-semibold text-slate-900 truncate">{user.full_name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-slate-900 truncate">{user.full_name}</p>
+                            {!isActive && (
+                              <Badge variant="outline" className="text-xs bg-slate-200 text-slate-600 border-slate-300">
+                                Inactive
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-sm text-slate-600 truncate">{user.email}</p>
                         </div>
                       </div>
                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
                         {isEditing ? (
+                          // ... editing role UI ...
                           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
                             <select
                               value={editingRole?.newRole || userRole}
@@ -346,6 +388,19 @@ export default function ManageUsers() {
                               {userRole === 'user' ? 'customer' : userRole}
                             </Badge>
                             <div className="flex items-center gap-2 flex-wrap">
+                              {isAdmin && user.id !== currentUser?.id && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleToggleActive(user.id, isActive)}
+                                  disabled={togglingActive === user.id}
+                                  className={isActive ? "text-slate-600" : "text-green-600 hover:text-green-700 hover:bg-green-50"}
+                                  title={isActive ? "Deactivate User" : "Activate User"}
+                                >
+                                  <Power className="w-4 h-4 mr-1" />
+                                  {isActive ? 'Deactivate' : 'Activate'}
+                                </Button>
+                              )}
                               {canChangeRole && (
                                 <Button
                                   size="sm"

@@ -15,6 +15,7 @@ import ForgotPassword from "./Pages/ForgotPassword";
 import Profile from "./Pages/Profile";
 import ChangePassword from "./Pages/ChangePassword";
 import Settings from "./Pages/Settings";
+import SystemSettingsPage from "./Pages/SystemSettings";
 import { routes } from "./utils";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { ToastProvider } from "./Context/ToastContext";
@@ -107,6 +108,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <Layout><Settings /></Layout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/system-settings"
+            element={
+              <ProtectedRoute requiredRole={['admin']}>
+                <Layout><SystemSettingsPage /></Layout>
               </ProtectedRoute>
             } 
           />
