@@ -111,6 +111,20 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
     }
   };
 
+  const handleLock = async (orderId: string) => {
+    try {
+      await Order.update(orderId, {
+        is_locked: true,
+        locked_date: new Date().toISOString()
+      });
+      showSuccess("Order locked successfully!");
+      onRefresh();
+    } catch (error) {
+      console.error("Error locking order:", error);
+      showError("Failed to lock order. Please try again.");
+    }
+  };
+
   const getStatusBadge = (order: any) => {
     const eligibleDate = addMonths(new Date(order.order_date), 6);
     const isEligible = isAfter(new Date(), eligibleDate);
@@ -264,6 +278,17 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
                           title="Unlock Order"
                         >
                           <Unlock className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {!isLocked && order.manually_unlocked && ['admin', 'manager'].includes(currentUserRole || '') && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleLock(order.id)}
+                          className="p-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                          title="Lock Order"
+                        >
+                          <Lock className="w-4 h-4" />
                         </Button>
                       )}
                       {currentUserRole === 'admin' && (
