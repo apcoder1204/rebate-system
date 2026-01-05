@@ -3,6 +3,8 @@ import pool from '../db/connection';
 import { AuthRequest } from '../middleware/auth';
 import { isValidUUID, sanitizeString, sanitizeNumber, sanitizeSortBy, isValidDate, isValidOrderStatus } from '../middleware/validation';
 
+import { SystemSettings } from '../services/systemSettings';
+
 export const listOrders = async (req: AuthRequest, res: Response) => {
   try {
     const sortBy = sanitizeSortBy(
@@ -11,15 +13,19 @@ export const listOrders = async (req: AuthRequest, res: Response) => {
       'order_date'
     );
     
+    // Get auto-lock days from settings
+    const autoLockDays = await SystemSettings.getNumber('auto_lock_days', 3);
+    
     // Check for auto-locking orders before listing
+    // Use dynamic interval based on settings
     await pool.query(`
       UPDATE orders
       SET is_locked = TRUE, locked_date = NOW()
       WHERE customer_status = 'pending'
-        AND order_date < NOW() - INTERVAL '3 days'
+        AND order_date < NOW() - ($1 || ' days')::INTERVAL
         AND is_locked = FALSE
         AND manually_unlocked = FALSE
-    `);
+    `, [autoLockDays]);
 
     let query = `
       SELECT 
@@ -80,16 +86,19 @@ export const getOrder = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Invalid order ID format' });
     }
 
+    // Get auto-lock days from settings
+    const autoLockDays = await SystemSettings.getNumber('auto_lock_days', 3);
+
     // Check for auto-locking this specific order
     await pool.query(`
       UPDATE orders
       SET is_locked = TRUE, locked_date = NOW()
       WHERE id = $1
         AND customer_status = 'pending'
-        AND order_date < NOW() - INTERVAL '3 days'
+        AND order_date < NOW() - ($2 || ' days')::INTERVAL
         AND is_locked = FALSE
         AND manually_unlocked = FALSE
-    `, [id]);
+    `, [id, autoLockDays]);
     
     const result = await pool.query(
       `SELECT 
@@ -209,8 +218,9 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
         }, 0);
       }
       
-      // Calculate rebate amount (default 1% if contract not specified)
-      const rebatePercent = rebate_percentage ? sanitizeNumber(rebate_percentage, 0, 100)! : 1.00;
+      // Calculate rebate amount (default from settings if contract not specified)
+      const defaultRebate = await SystemSettings.getNumber('default_rebate_percentage', 1.00);
+      const rebatePercent = rebate_percentage ? sanitizeNumber(rebate_percentage, 0, 100)! : defaultRebate;
       const rebateAmount = calculatedTotal * (rebatePercent / 100);
       
       const orderNumber = `ORD-${Date.now()}`;
@@ -268,6 +278,8 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+import { AuditService } from '../services/auditService';
 
 export const updateOrder = async (req: AuthRequest, res: Response) => {
   try {
@@ -381,9 +393,10 @@ export const updateOrder = async (req: AuthRequest, res: Response) => {
         const sanitizedTotal = sanitizeNumber(total_amount, 0, 20000000)!;
         updates.push(`total_amount = $${paramCount++}`);
         values.push(sanitizedTotal);
-        // Recalculate rebate amount (1% default)
+        // Recalculate rebate amount (default from settings)
+        const defaultRebate = await SystemSettings.getNumber('default_rebate_percentage', 1.00);
         updates.push(`rebate_amount = $${paramCount++}`);
-        values.push(sanitizedTotal * 0.01);
+        values.push(sanitizedTotal * (defaultRebate / 100));
       }
       if (customer_status !== undefined) {
         updates.push(`customer_status = $${paramCount++}`);
@@ -407,10 +420,30 @@ export const updateOrder = async (req: AuthRequest, res: Response) => {
           
           updates.push(`manually_unlocked = $${paramCount++}`);
           values.push(true);
+          
+          // Log unlock action
+          await AuditService.log(
+            req.user!.id,
+            'unlock_order',
+            'order',
+            id,
+            { previous_locked: true },
+            req.ip
+          );
         } else if (is_locked === true) {
           // If manually locking
           updates.push(`locked_date = $${paramCount++}`);
           values.push(new Date().toISOString());
+
+          // Log lock action
+          await AuditService.log(
+            req.user!.id,
+            'lock_order',
+            'order',
+            id,
+            { previous_locked: false },
+            req.ip
+          );
         }
       }
 
@@ -448,9 +481,10 @@ export const updateOrder = async (req: AuthRequest, res: Response) => {
           return sum + (item.quantity * item.unit_price);
         }, 0);
         
+        const defaultRebate = await SystemSettings.getNumber('default_rebate_percentage', 1.00);
         await client.query(
           'UPDATE orders SET total_amount = $1, rebate_amount = $2 WHERE id = $3',
-          [itemsTotal, itemsTotal * 0.01, id]
+          [itemsTotal, itemsTotal * (defaultRebate / 100), id]
         );
       }
       
@@ -519,15 +553,18 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
       'order_date'
     );
     
+    // Get auto-lock days from settings
+    const autoLockDays = await SystemSettings.getNumber('auto_lock_days', 3);
+    
     // Check for auto-locking orders before filtering
     await pool.query(`
       UPDATE orders
       SET is_locked = TRUE, locked_date = NOW()
       WHERE customer_status = 'pending'
-        AND order_date < NOW() - INTERVAL '3 days'
+        AND order_date < NOW() - ($1 || ' days')::INTERVAL
         AND is_locked = FALSE
         AND manually_unlocked = FALSE
-    `);
+    `, [autoLockDays]);
 
     let query = `
       SELECT 
