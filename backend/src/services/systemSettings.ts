@@ -70,7 +70,7 @@ export const SystemSettings = {
   async refreshCache() {
     try {
       const result = await pool.query('SELECT key, value FROM system_settings');
-      settingsCache = result.rows.reduce((acc, row) => {
+      settingsCache = result.rows.reduce((acc: Record<string, string>, row: any) => {
         acc[row.key] = row.value;
         return acc;
       }, {} as Record<string, string>);
