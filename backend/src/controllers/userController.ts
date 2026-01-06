@@ -32,7 +32,9 @@ export const login = async (req: Request, res: Response) => {
     );
     
     if (result.rows.length === 0) {
-      console.log(`Login attempt failed: User not found for email: ${sanitizedEmail}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`Login attempt failed: User not found for email: ${sanitizedEmail}`);
+      }
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
@@ -40,14 +42,18 @@ export const login = async (req: Request, res: Response) => {
 
     // Check if account is active
     if (user.is_active === false) {
-      console.log(`Login attempt failed: Inactive account for email: ${sanitizedEmail}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`Login attempt failed: Inactive account for email: ${sanitizedEmail}`);
+      }
       return res.status(403).json({ error: 'Account is inactive. Please contact support.' });
     }
 
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     
     if (!isValidPassword) {
-      console.log(`Login attempt failed: Invalid password for email: ${sanitizedEmail}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`Login attempt failed: Invalid password for email: ${sanitizedEmail}`);
+      }
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
@@ -57,7 +63,12 @@ export const login = async (req: Request, res: Response) => {
       { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as any }
     );
     
-    console.log(`Login successful for user: ${user.email} (${user.role})`);
+    // Log only success without sensitive details in production
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`Login successful for user: ${user.email} (${user.role})`);
+    } else {
+      console.log(`Login successful for user ID: ${user.id}`);
+    }
     
     res.json({
       user: {

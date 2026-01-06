@@ -142,7 +142,11 @@ export async function sendVerificationCodeByEmail(
         };
       }
 
-      console.log(`Verification email sent to ${normalizedEmail}, ID: ${data?.id}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`Verification email sent to ${normalizedEmail}, ID: ${data?.id}`);
+      } else {
+        console.log(`Verification email sent, ID: ${data?.id}`);
+      }
       return { success: true, message: 'Verification code sent to your email' };
     } catch (resendError: any) {
       console.error('Resend error:', resendError);
