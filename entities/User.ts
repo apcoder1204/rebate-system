@@ -8,6 +8,7 @@ export type UserType = {
   phone?: string;
   created_date?: string;
   updated_date?: string;
+  is_active?: boolean;
 };
 
 const LS_KEY = "rebate_user";

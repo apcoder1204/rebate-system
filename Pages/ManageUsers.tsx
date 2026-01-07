@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { User, UserType } from "@/entities/User";
+import { Admin } from "@/entities/Admin";
 import { Card, CardContent, CardHeader, CardTitle } from "@/Components/ui/card";
 import { Badge } from "@/Components/ui/badge";
 import { Input } from "@/Components/ui/input";
@@ -13,7 +14,8 @@ import {
   XCircle,
   AlertCircle,
   Settings,
-  Trash2
+  Trash2,
+  Power
 } from "lucide-react";
 import { format } from "date-fns";
 import { createPageUrl } from "@/utils";
@@ -32,6 +34,7 @@ export default function ManageUsers() {
   const [editingRole, setEditingRole] = useState<{userId: string, newRole: string} | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [togglingActive, setTogglingActive] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const loadData = useCallback(async () => {
