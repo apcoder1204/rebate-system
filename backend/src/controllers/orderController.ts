@@ -292,7 +292,7 @@ export const updateOrder = async (req: AuthRequest, res: Response) => {
     }
     
     // Check if order exists and user has permission
-    const orderResult = await pool.query('SELECT customer_id, customer_status, created_by FROM orders WHERE id = $1', [id]);
+    const orderResult = await pool.query('SELECT customer_id, customer_status, created_by, is_locked FROM orders WHERE id = $1', [id]);
     if (orderResult.rows.length === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
@@ -304,6 +304,12 @@ export const updateOrder = async (req: AuthRequest, res: Response) => {
       if (existingOrder.customer_id !== req.user!.id) {
         return res.status(403).json({ error: 'Access denied' });
       }
+      
+      // Prevent customers from confirming/disputing locked orders
+      if (customer_status !== undefined && existingOrder.is_locked === true) {
+        return res.status(403).json({ error: 'This order is locked. Please contact support for assistance.' });
+      }
+      
       // Users can only update status/comment
       if (order_date !== undefined || items !== undefined || total_amount !== undefined) {
         return res.status(403).json({ error: 'Users can only update status and comments' });

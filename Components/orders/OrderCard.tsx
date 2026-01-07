@@ -51,10 +51,18 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
       } else {
         showSuccess("Order confirmed successfully!", 5000);
       }
-      onRefresh();
-    } catch (error) {
+      // Refresh order data to get latest status
+      await onRefresh();
+    } catch (error: any) {
       console.error("Error updating order:", error);
-      showError("Failed to update order status. Please try again.");
+      // Check if error is due to locked order
+      if (error?.message?.includes('locked') || error?.response?.data?.error?.includes('locked')) {
+        showWarning("This order is locked. Please refresh the page or contact support for assistance.");
+        // Refresh to get latest order status
+        await onRefresh();
+      } else {
+        showError(error?.response?.data?.error || "Failed to update order status. Please try again.");
+      }
     }
     setConfirming(false);
   };
