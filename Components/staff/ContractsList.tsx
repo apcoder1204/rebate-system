@@ -53,17 +53,17 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <Badge className="bg-green-100 text-green-700">Active</Badge>;
+        return <Badge className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">Active</Badge>;
       case 'approved':
-        return <Badge className="bg-blue-100 text-blue-700">Approved</Badge>;
+        return <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">Approved</Badge>;
       case 'pending_approval':
-        return <Badge className="bg-yellow-100 text-yellow-700">Pending Approval</Badge>;
+        return <Badge className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">Pending Approval</Badge>;
       case 'pending':
-        return <Badge className="bg-amber-100 text-amber-700">Pending</Badge>;
+        return <Badge className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">Pending</Badge>;
       case 'rejected':
-        return <Badge className="bg-red-100 text-red-700">Rejected</Badge>;
+        return <Badge className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">Rejected</Badge>;
       default:
-        return <Badge className="bg-slate-100 text-slate-700">Unknown</Badge>;
+        return <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">Unknown</Badge>;
     }
   };
 
@@ -148,7 +148,7 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
         </CardHeader>
         <CardContent>
           {filteredContracts.length === 0 ? (
-            <div className="text-center py-8 text-slate-500">
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
               No contracts found
             </div>
           ) : (
@@ -156,7 +156,7 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
               {filteredContracts.map((contract: any) => (
                 <div
                   key={contract.id}
-                  className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors gap-4"
+                  className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors gap-4"
                 >
                   <div className="flex items-center gap-4 w-full md:w-auto">
                     <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30 flex-shrink-0">
@@ -164,10 +164,10 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <p className="font-bold text-slate-900 truncate">{contract.contract_number}</p>
+                        <p className="font-bold text-slate-900 dark:text-slate-100 truncate">{contract.contract_number}</p>
                         {getStatusBadge(contract.status)}
                       </div>
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm text-slate-600">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm text-slate-600 dark:text-slate-400">
                         <div className="flex items-center gap-1 truncate">
                           <User className="w-3 h-3 flex-shrink-0" />
                           <span className="truncate">{contract.customer_name}</span>
@@ -183,12 +183,12 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
                           </div>
                         )}
                         {(['admin', 'manager', 'staff'].includes(currentUserRole || '') && contract.creator_name) && (
-                          <div className="flex items-center gap-1 truncate text-xs text-slate-500">
+                          <div className="flex items-center gap-1 truncate text-xs text-slate-500 dark:text-slate-400">
                             <span>Created by: {contract.creator_name}</span>
                           </div>
                         )}
                         {(['admin', 'manager'].includes(currentUserRole || '') && contract.approver_name) && (
-                          <div className="flex items-center gap-1 truncate text-xs text-green-600">
+                          <div className="flex items-center gap-1 truncate text-xs text-green-600 dark:text-green-400">
                             <span>Approved by: {contract.approver_name}</span>
                           </div>
                         )}
@@ -198,7 +198,7 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
                   
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
                     <div className="text-left sm:text-right w-full sm:w-auto">
-                      <div className="flex items-center gap-1 text-sm text-slate-600">
+                      <div className="flex items-center gap-1 text-sm text-slate-600 dark:text-slate-400">
                         <Calendar className="w-3 h-3 flex-shrink-0" />
                         <span>
                           {contract.start_date && format(new Date(contract.start_date), 'MMM d, yyyy')} → 

@@ -132,15 +132,15 @@ export default function ManageOrders() {
             return (
               <div className="space-y-3">
                 {disputedOrders.length > 0 && (
-                  <Card className="border-2 border-red-300 bg-red-50">
+                  <Card className="border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
-                        <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                        <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
                         <div className="flex-1">
-                          <p className="font-semibold text-red-900">
+                          <p className="font-semibold text-red-900 dark:text-red-100">
                             {disputedOrders.length} Order{disputedOrders.length > 1 ? 's' : ''} Require{disputedOrders.length === 1 ? 's' : ''} Attention
                           </p>
-                          <p className="text-sm text-red-800">
+                          <p className="text-sm text-red-800 dark:text-red-200">
                             Customer{disputedOrders.length > 1 ? 's have' : ' has'} disputed {disputedOrders.length === 1 ? 'an order' : 'orders'}. Please review and take action.
                           </p>
                         </div>
@@ -148,7 +148,7 @@ export default function ManageOrders() {
                           variant="outline"
                           size="sm"
                           onClick={() => setFilterStatus('disputed')}
-                          className="border-red-300 text-red-700 hover:bg-red-100"
+                          className="border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30"
                         >
                           View Disputed Orders
                         </Button>
@@ -157,15 +157,15 @@ export default function ManageOrders() {
                   </Card>
                 )}
                 {lockedOrders.length > 0 && (
-                  <Card className="border-2 border-orange-300 bg-orange-50">
+                  <Card className="border-2 border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
-                        <Lock className="w-5 h-5 text-orange-600 flex-shrink-0" />
+                        <Lock className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
                         <div className="flex-1">
-                          <p className="font-semibold text-orange-900">
+                          <p className="font-semibold text-orange-900 dark:text-orange-100">
                             {lockedOrders.length} Locked Order{lockedOrders.length > 1 ? 's' : ''}
                           </p>
-                          <p className="text-sm text-orange-800">
+                          <p className="text-sm text-orange-800 dark:text-orange-200">
                             {lockedOrders.length === 1 ? 'An order has' : 'Orders have'} been locked due to non-confirmation within 3 days.
                           </p>
                         </div>
@@ -183,7 +183,7 @@ export default function ManageOrders() {
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row gap-6 items-end">
               <div className="flex-1">
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Filter by Customer
                 </label>
                 <Combobox
@@ -202,7 +202,7 @@ export default function ManageOrders() {
               </div>
               
               <div className="w-full md:w-56">
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Status
                 </label>
                 <Combobox

@@ -130,14 +130,14 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
     const isEligible = isAfter(new Date(), eligibleDate);
     
     if (order.customer_status === 'confirmed') {
-      return <Badge className="bg-green-100 text-green-700">Confirmed</Badge>;
+      return <Badge className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">Confirmed</Badge>;
     } else if (order.customer_status === 'disputed') {
-      return <Badge className="bg-red-100 text-red-700 flex items-center gap-1">
+      return <Badge className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 flex items-center gap-1">
         <AlertCircle className="w-3 h-3" />
         Disputed
       </Badge>;
     } else {
-      return <Badge className="bg-amber-100 text-amber-700">Pending</Badge>;
+      return <Badge className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">Pending</Badge>;
     }
   };
 
@@ -168,7 +168,7 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
       </CardHeader>
       <CardContent>
         {filteredOrders.length === 0 ? (
-          <div className="text-center py-8 text-slate-500">
+          <div className="text-center py-8 text-slate-500 dark:text-slate-400">
             No orders found
           </div>
         ) : (
@@ -184,10 +184,10 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
                 key={order.id}
                 className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 border rounded-xl transition-colors gap-4 ${
                   isDisputed 
-                    ? 'border-red-300 bg-red-50 hover:bg-red-100' 
+                    ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30' 
                     : isLocked
-                    ? 'border-orange-300 bg-orange-50 hover:bg-orange-100'
-                    : 'border-slate-200 hover:bg-slate-50'
+                    ? 'border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30'
+                    : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50'
                 }`}
               >
                 <div className="flex items-center gap-4 w-full md:w-auto">
@@ -195,15 +195,15 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
                     <ShoppingCart className="w-6 h-6 text-white" />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-bold text-slate-900 truncate">{order.order_number}</p>
+                    <p className="font-bold text-slate-900 dark:text-slate-100 truncate">{order.order_number}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <Calendar className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                      <p className="text-sm text-slate-600 truncate">
+                      <Calendar className="w-3 h-3 text-slate-400 dark:text-slate-500 flex-shrink-0" />
+                      <p className="text-sm text-slate-600 dark:text-slate-400 truncate">
                         {format(new Date(order.order_date), 'MMM d, yyyy')}
                       </p>
                     </div>
                     {(['admin', 'manager'].includes(currentUserRole || '') || currentUserId === order.created_by) && (
-                      <p className="text-xs text-slate-500 mt-1">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                         Created by: {order.creator_name || order.created_by || 'Unknown'}
                       </p>
                     )}
@@ -213,26 +213,26 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
                   <div className="flex flex-row sm:flex-col justify-between w-full sm:w-auto sm:text-right gap-2 sm:gap-0">
                     <div>
-                      <p className="font-bold text-slate-900">Tsh {parseFloat(String(order.total_amount || 0)).toFixed(2)}</p>
-                      <p className="text-sm text-green-600 font-medium">Tsh {parseFloat(String(order.rebate_amount || 0)).toFixed(2)} rebate</p>
+                      <p className="font-bold text-slate-900 dark:text-slate-100">Tsh {parseFloat(String(order.total_amount || 0)).toFixed(2)}</p>
+                      <p className="text-sm text-green-600 dark:text-green-400 font-medium">Tsh {parseFloat(String(order.rebate_amount || 0)).toFixed(2)} rebate</p>
                     </div>
                     <div className="sm:hidden text-right">
-                       <p className="text-sm text-slate-600">{order.items?.length || 0} items</p>
+                       <p className="text-sm text-slate-600 dark:text-slate-400">{order.items?.length || 0} items</p>
                     </div>
                   </div>
                   <div className="hidden sm:block text-right">
-                    <p className="text-sm text-slate-600">{order.items?.length || 0} items</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">{order.items?.length || 0} items</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                     {getStatusBadge(order)}
                     {isLocked && (
-                      <Badge className="bg-orange-100 text-orange-700 flex items-center gap-1">
+                      <Badge className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 flex items-center gap-1">
                         <Lock className="w-3 h-3" />
                         Locked
                       </Badge>
                     )}
                     {isDisputed && order.customer_comment && (
-                      <div className="text-xs text-red-700 max-w-xs truncate w-full sm:w-auto" title={order.customer_comment}>
+                      <div className="text-xs text-red-700 dark:text-red-300 max-w-xs truncate w-full sm:w-auto" title={order.customer_comment}>
                         <AlertCircle className="w-3 h-3 inline mr-1" />
                         {order.customer_comment.substring(0, 30)}...
                       </div>
@@ -266,7 +266,7 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
                           onClick={() => onEdit(order)} 
                           className="p-2"
                         >
-                           <Eye className="w-4 h-4 text-slate-500" />
+                           <Eye className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                         </Button>
                       )}
                       {isLocked && ['admin', 'manager'].includes(currentUserRole || '') && (

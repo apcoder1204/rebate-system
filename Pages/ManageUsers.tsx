@@ -217,9 +217,9 @@ export default function ManageUsers() {
 
         {/* Error Message */}
         {error && (
-          <Card className="border-red-200 bg-red-50">
+          <Card className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
             <CardContent className="p-4">
-              <div className="flex items-center gap-2 text-red-800">
+              <div className="flex items-center gap-2 text-red-800 dark:text-red-200">
                 <AlertCircle className="w-5 h-5" />
                 <p>{error}</p>
               </div>
@@ -266,13 +266,13 @@ export default function ManageUsers() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 border-b border-slate-200">
+        <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
           <button
             onClick={() => setActiveTab('users')}
             className={`px-4 py-2 font-medium transition-colors ${
               activeTab === 'users'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
             Users ({users.length})
@@ -282,13 +282,13 @@ export default function ManageUsers() {
               onClick={() => setActiveTab('requests')}
               className={`px-4 py-2 font-medium transition-colors relative ${
                 activeTab === 'requests'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               Role Requests ({roleRequests.length})
               {roleRequests.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 dark:bg-red-600 text-white text-xs rounded-full flex items-center justify-center">
                   {roleRequests.length}
                 </span>
               )}
@@ -317,10 +317,10 @@ export default function ManageUsers() {
               <div className="space-y-4">
                 {filteredUsers.map((user) => {
                   const userRole = user.role || 'user';
-                  let badgeColor = 'bg-blue-100 text-blue-700';
-                  if (userRole === 'admin') badgeColor = 'bg-red-100 text-red-700';
-                  else if (userRole === 'manager') badgeColor = 'bg-purple-100 text-purple-700';
-                  else if (userRole === 'staff') badgeColor = 'bg-amber-100 text-amber-700';
+                  let badgeColor = 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300';
+                  if (userRole === 'admin') badgeColor = 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300';
+                  else if (userRole === 'manager') badgeColor = 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300';
+                  else if (userRole === 'staff') badgeColor = 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300';
                   
                   const isLastAdmin = userRole === 'admin' && stats.admins === 1;
                   const canChangeRole = isAdmin && !isLastAdmin; // Only show button if not last admin
@@ -331,7 +331,7 @@ export default function ManageUsers() {
                   return (
                     <div
                       key={user.id}
-                      className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors gap-4 ${!isActive ? 'bg-slate-100 opacity-75' : ''}`}
+                      className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors gap-4 ${!isActive ? 'bg-slate-100 dark:bg-slate-800/30 opacity-75' : ''}`}
                     >
                       <div className="flex items-center gap-4 w-full md:w-auto">
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${!isActive ? 'bg-slate-400' : 'bg-gradient-to-br from-blue-500 to-blue-700'}`}>
@@ -341,14 +341,14 @@ export default function ManageUsers() {
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="font-semibold text-slate-900 truncate">{user.full_name}</p>
+                            <p className="font-semibold text-slate-900 dark:text-slate-100 truncate">{user.full_name}</p>
                             {!isActive && (
-                              <Badge variant="outline" className="text-xs bg-slate-200 text-slate-600 border-slate-300">
+                              <Badge variant="outline" className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600">
                                 Inactive
                               </Badge>
                             )}
                           </div>
-                          <p className="text-sm text-slate-600 truncate">{user.email}</p>
+                          <p className="text-sm text-slate-600 dark:text-slate-400 truncate">{user.email}</p>
                         </div>
                       </div>
                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
@@ -358,7 +358,7 @@ export default function ManageUsers() {
                             <select
                               value={editingRole?.newRole || userRole}
                               onChange={(e) => setEditingRole({ userId: user.id, newRole: e.target.value })}
-                              className="px-3 py-1 border border-slate-300 rounded-md text-sm w-full sm:w-auto"
+                              className="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-md text-sm w-full sm:w-auto bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                               disabled={!isAdmin}
                             >
                               <option value="user">Customer</option>
@@ -427,14 +427,14 @@ export default function ManageUsers() {
                                 </Button>
                               )}
                               {isLastAdmin && (
-                                <span className="text-xs text-slate-500 italic" title="Cannot change role of last admin">
+                                <span className="text-xs text-slate-500 dark:text-slate-400 italic" title="Cannot change role of last admin">
                                   Last Admin
                                 </span>
                               )}
                             </div>
                           </div>
                         )}
-                        <p className="text-sm text-slate-500 whitespace-nowrap hidden md:block">
+                        <p className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap hidden md:block">
                           {user.created_date ? format(new Date(user.created_date), 'MMM d, yyyy') : 'N/A'}
                         </p>
                       </div>
@@ -455,22 +455,22 @@ export default function ManageUsers() {
             <CardContent>
               {roleRequests.length === 0 ? (
                 <div className="text-center py-12">
-                  <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4 opacity-50" />
-                  <p className="text-slate-600">No pending role requests</p>
+                  <CheckCircle className="w-16 h-16 text-green-500 dark:text-green-400 mx-auto mb-4 opacity-50" />
+                  <p className="text-slate-600 dark:text-slate-400">No pending role requests</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {roleRequests.map((request: any) => {
                     const roleColors: Record<string, string> = {
-                      admin: 'bg-red-100 text-red-700',
-                      manager: 'bg-purple-100 text-purple-700',
-                      staff: 'bg-amber-100 text-amber-700',
+                      admin: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
+                      manager: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300',
+                      staff: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
                     };
                     
                     return (
                       <div
                         key={request.id}
-                        className="p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+                        className="p-4 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                       >
                         <div className="flex flex-col md:flex-row items-start justify-between gap-4">
                           <div className="flex-1 w-full">
@@ -481,18 +481,18 @@ export default function ManageUsers() {
                                 </span>
                               </div>
                               <div className="min-w-0">
-                                <p className="font-semibold text-slate-900 truncate">{request.user_name}</p>
-                                <p className="text-sm text-slate-600 truncate">{request.user_email}</p>
+                                <p className="font-semibold text-slate-900 dark:text-slate-100 truncate">{request.user_name}</p>
+                                <p className="text-sm text-slate-600 dark:text-slate-400 truncate">{request.user_email}</p>
                               </div>
                             </div>
                             <div className="ml-0 md:ml-13 space-y-1">
                               <div className="flex items-center gap-2">
-                                <span className="text-sm text-slate-600">Requested Role:</span>
-                                <Badge className={roleColors[request.requested_role] || 'bg-blue-100 text-blue-700'}>
+                                <span className="text-sm text-slate-600 dark:text-slate-400">Requested Role:</span>
+                                <Badge className={roleColors[request.requested_role] || 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'}>
                                   {request.requested_role}
                                 </Badge>
                               </div>
-                              <p className="text-xs text-slate-500">
+                              <p className="text-xs text-slate-500 dark:text-slate-400">
                                 Requested on {format(new Date(request.requested_date), 'MMM d, yyyy h:mm a')}
                               </p>
                             </div>
