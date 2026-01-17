@@ -15,7 +15,8 @@
     "sync:to-primary": "tsx src/db/sync-script.ts to-primary",
     "check-admin": "tsx src/db/check-admin.ts",
     "create-admin": "tsx src/db/create-admin.ts",
-    "migrate:email": "tsx src/db/migrate_email_verification.ts"
+    "migrate:email": "tsx src/db/migrate_email_verification.ts",
+    "migrate:order-reminder": "tsx src/db/migrate_order_reminder.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -28,6 +29,7 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "pg": "^8.11.3",
+    "node-cron": "^3.0.3",
     "resend": "^6.6.0",
     "twilio": "^5.10.7",
     "uuid": "^9.0.1",
@@ -37,6 +39,7 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/multer": "^1.4.11",
     "@types/node": "^20.10.6",
+    "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.10.9",
     "@types/uuid": "^9.0.7",
     "tsx": "^4.7.0",

@@ -3,8 +3,10 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import cron from 'node-cron';
 import routes from './routes';
 import { securityHeaders, apiRateLimit } from './middleware/security';
+import { sendOrderReminders } from './services/orderReminderService';
 
 dotenv.config();
 
@@ -113,5 +115,25 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  
+  // Schedule order reminder emails to run every 7 days at 9:00 AM
+  // Cron format: minute hour day month day-of-week
+  // This runs at 9:00 AM every Sunday
+  // Note: To run every 7 days regardless of day, you might want to use a different approach
+  // For now, this runs weekly on Sundays. You can change '0' to any day (0=Sunday, 1=Monday, etc.)
+  cron.schedule('0 9 * * 0', async () => {
+    console.log('📧 Running scheduled order reminder job...');
+    try {
+      const result = await sendOrderReminders();
+      console.log(`📧 Order reminder job completed: ${result.message}`);
+    } catch (error) {
+      console.error('❌ Error in scheduled order reminder job:', error);
+    }
+  }, {
+    scheduled: true,
+    timezone: "Africa/Dar_es_Salaam" // Adjust to your timezone
+  });
+  
+  console.log('📧 Order reminder scheduler initialized (runs every Sunday at 9:00 AM)');
 });
 

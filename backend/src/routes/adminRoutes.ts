@@ -1,6 +1,6 @@
 import express from 'express';
 import { authenticate } from '../middleware/auth';
-import { getSettings, updateSetting, getAuditLogs, toggleUserActive } from '../controllers/adminController';
+import { getSettings, updateSetting, getAuditLogs, toggleUserActive, triggerOrderReminders } from '../controllers/adminController';
 
 const router = express.Router();
 
@@ -13,6 +13,9 @@ router.get('/logs', authenticate, getAuditLogs);
 
 // User Management Extension
 router.put('/users/:id/active', authenticate, toggleUserActive);
+
+// Order Reminders
+router.post('/reminders/send', authenticate, triggerOrderReminders);
 
 export default router;
 

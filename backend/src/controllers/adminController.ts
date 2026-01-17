@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { SystemSettings } from '../services/systemSettings';
 import { AuditService } from '../services/auditService';
+import { sendOrderReminders } from '../services/orderReminderService';
 import pool from '../db/connection';
 import { isValidUUID } from '../middleware/validation';
 
@@ -139,3 +140,29 @@ export const toggleUserActive = async (req: AuthRequest, res: Response) => {
   }
 };
 
+// ==================== ORDER REMINDERS ====================
+
+export const triggerOrderReminders = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!['admin', 'manager'].includes(req.user!.role)) {
+      return res.status(403).json({ error: 'Only admins and managers can trigger order reminders' });
+    }
+
+    const result = await sendOrderReminders();
+
+    // Log action
+    await AuditService.log(
+      req.user!.id,
+      'trigger_order_reminders',
+      'system',
+      null,
+      { emails_sent: result.emailsSent, errors: result.errors },
+      req.ip
+    );
+
+    res.json(result);
+  } catch (error) {
+    console.error('Trigger order reminders error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
