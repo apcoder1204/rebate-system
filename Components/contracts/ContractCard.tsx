@@ -16,31 +16,31 @@ export default function ContractCard({ contract }) {
   const getStatusIcon = () => {
     switch (contract.status) {
       case 'active':
-        return <CheckCircle className="w-4 h-4 text-green-600" />;
+        return <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />;
       case 'pending':
-        return <Clock className="w-4 h-4 text-amber-600" />;
+        return <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />;
       case 'expired':
-        return <AlertCircle className="w-4 h-4 text-red-600" />;
+        return <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />;
       default:
-        return <Clock className="w-4 h-4 text-slate-600" />;
+        return <Clock className="w-4 h-4 text-slate-600 dark:text-slate-400" />;
     }
   };
 
   const getStatusBadge = () => {
     switch (contract.status) {
       case 'active':
-        return <Badge className="bg-green-100 text-green-700">Active</Badge>;
+        return <Badge className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">Active</Badge>;
       case 'pending':
-        return <Badge className="bg-amber-100 text-amber-700">Pending</Badge>;
+        return <Badge className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">Pending</Badge>;
       case 'expired':
-        return <Badge className="bg-red-100 text-red-700">Expired</Badge>;
+        return <Badge className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">Expired</Badge>;
       default:
-        return <Badge className="bg-slate-100 text-slate-700">Unknown</Badge>;
+        return <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">Unknown</Badge>;
     }
   };
 
   return (
-    <Card className="border-0 shadow-xl hover:shadow-2xl transition-shadow duration-300">
+    <Card className="border-0 shadow-xl hover:shadow-2xl transition-shadow duration-300 dark:bg-slate-800 dark:border-slate-700">
       <CardContent className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -48,7 +48,7 @@ export default function ContractCard({ contract }) {
               <FileText className="w-6 h-6 text-white" />
             </div>
             <div>
-              <p className="font-bold text-slate-900 text-lg">
+              <p className="font-bold text-slate-900 dark:text-slate-100 text-lg">
                 {contract.contract_number}
               </p>
               <div className="flex items-center gap-2 mt-1">
@@ -69,16 +69,16 @@ export default function ContractCard({ contract }) {
         </div>
 
         <div className="space-y-3">
-          <div className="flex items-center gap-2 text-sm text-slate-600">
+          <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
             <Calendar className="w-4 h-4" />
             <span>
               {format(new Date(contract.start_date), 'MMM d, yyyy')} - {format(new Date(contract.end_date), 'MMM d, yyyy')}
             </span>
           </div>
           
-          <div className="p-3 bg-slate-50 rounded-lg">
-            <p className="text-xs text-slate-600 mb-1">Rebate Percentage</p>
-            <p className="font-bold text-slate-900 text-lg">1%</p>
+          <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+            <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Rebate Percentage</p>
+            <p className="font-bold text-slate-900 dark:text-slate-100 text-lg">1%</p>
           </div>
         </div>
       </CardContent>

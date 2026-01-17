@@ -174,7 +174,7 @@ export default function MyContracts() {
 
         {/* Contract Form - Always shown when no contract exists */}
         {contracts.length === 0 && (
-          <Card className="border-2 border-slate-200 dark:border-slate-700 shadow-lg">
+          <Card className="border-2 border-slate-200 dark:border-slate-700 shadow-lg dark:bg-slate-800">
             <CardContent className="p-6 md:p-8">
               <div className="space-y-6">
                 {/* Contract Preview Button */}
@@ -191,7 +191,7 @@ export default function MyContracts() {
                 </div>
 
                 {/* Terms and Conditions Checkbox */}
-                <div className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                <div className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
                   <input
                     type="checkbox"
                     id="agreeTerms"
@@ -203,7 +203,7 @@ export default function MyContracts() {
                         setSignatureDataUrl(null);
                       }
                     }}
-                    className="mt-1 w-5 h-5 text-blue-600 dark:text-blue-400 border-slate-300 dark:border-slate-600 rounded focus:ring-blue-500 dark:focus:ring-blue-400"
+                    className="mt-1 w-5 h-5 text-blue-600 dark:text-blue-400 border-slate-300 dark:border-slate-600 rounded focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-slate-700"
                   />
                   <label htmlFor="agreeTerms" className="text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
                     I have read and agree to the terms and conditions of this contract. I understand that this contract will last for exactly 6 months from the start date.
@@ -271,7 +271,7 @@ export default function MyContracts() {
                       <div className="border-2 border-green-500 dark:border-green-600 rounded-lg p-4 bg-green-50 dark:bg-green-900/20">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <div className="w-32 h-16 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 p-2">
+                            <div className="w-32 h-16 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 p-2">
                               <img
                                 src={signatureDataUrl}
                                 alt="Signature"

@@ -26,6 +26,12 @@ export const Admin = {
     return apiRequest('/admin/settings');
   },
 
+  async getSetting(key: string): Promise<string | null> {
+    const settings = await this.getSettings();
+    const setting = settings.find(s => s.key === key);
+    return setting ? setting.value : null;
+  },
+
   async updateSetting(key: string, value: string): Promise<SystemSetting> {
     return apiRequest('/admin/settings', {
       method: 'PUT',

@@ -34,8 +34,8 @@ export default function OrderFilters({
         />
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-2 text-slate-600 text-sm font-medium">
-          <Filter className="w-4 h-4 text-slate-500" />
+        <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-sm font-medium">
+          <Filter className="w-4 h-4 text-slate-500 dark:text-slate-400" />
           Status:
         </div>
         <div className="flex flex-wrap gap-2">
@@ -46,7 +46,7 @@ export default function OrderFilters({
               variant={filterStatus === option.value ? "default" : "outline"}
               size="sm"
               onClick={() => setFilterStatus(option.value)}
-              className={filterStatus === option.value ? "" : "border-slate-300 text-slate-700"}
+              className={filterStatus === option.value ? "" : "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300"}
             >
               {option.label}
             </Button>

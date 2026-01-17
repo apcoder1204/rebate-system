@@ -331,7 +331,7 @@ export default function SystemSettingsPage() {
                               <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Rebate Amount</span>
                             </div>
                             <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                              ${customerRebateData.totalRebate.toFixed(2)}
+                              Tsh {customerRebateData.totalRebate.toFixed(2)}
                             </p>
                           </div>
                         </div>

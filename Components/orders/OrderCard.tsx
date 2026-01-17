@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Order } from "@/entities/Order";
+import { Admin } from "@/entities/Admin";
 import { Card, CardContent } from "@/Components/ui/card";
 import { Badge } from "@/Components/ui/badge";
 import { Button } from "@/Components/ui/button";
@@ -19,17 +20,39 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
   const [confirming, setConfirming] = useState(false);
   const [comment, setComment] = useState(order.customer_comment || "");
   const [showComment, setShowComment] = useState(false);
+  const [autoLockDays, setAutoLockDays] = useState<number>(3); // Default to 3 days
+
+  // Fetch auto-lock days setting
+  useEffect(() => {
+    const fetchAutoLockDays = async () => {
+      try {
+        const settingValue = await Admin.getSetting('auto_lock_days');
+        if (settingValue) {
+          const days = parseInt(settingValue, 10);
+          if (!isNaN(days) && days > 0) {
+            setAutoLockDays(days);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching auto_lock_days setting:', error);
+        // Keep default value of 3
+      }
+    };
+    fetchAutoLockDays();
+  }, []);
 
   const eligibleDate = addMonths(new Date(order.order_date), 6);
   const isEligible = isAfter(new Date(), eligibleDate);
   
-  // Calculate days since order creation and lock status
+  // Calculate days since order creation and lock status using configured auto_lock_days
   const orderDate = new Date(order.order_date);
   const daysSinceOrder = differenceInDays(new Date(), orderDate);
-  const lockDeadline = addDays(orderDate, 3);
+  const lockDeadline = addDays(orderDate, autoLockDays);
   const daysUntilLock = differenceInDays(lockDeadline, new Date());
+  
   // Use backend status for locking
   const isLocked = !!order.is_locked;
+  // Show reminder 3 days before the auto-lock deadline (when daysUntilLock is between 1 and 3)
   const shouldShowReminder = order.customer_status === 'pending' && !isLocked && daysUntilLock <= 3 && daysUntilLock > 0;
 
   const handleConfirm = async (status: 'confirmed' | 'disputed') => {
@@ -71,21 +94,21 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
     switch (order.customer_status) {
       case 'confirmed':
         return (
-          <Badge className="bg-green-100 text-green-700">
+          <Badge className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
             <CheckCircle className="w-3 h-3 mr-1" />
             Confirmed
           </Badge>
         );
       case 'disputed':
         return (
-          <Badge className="bg-red-100 text-red-700">
+          <Badge className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
             <XCircle className="w-3 h-3 mr-1" />
             Disputed
           </Badge>
         );
       default:
         return (
-          <Badge className="bg-amber-100 text-amber-700">
+          <Badge className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
             <Clock className="w-3 h-3 mr-1" />
             Awaiting Confirmation
           </Badge>
@@ -94,7 +117,7 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
   };
 
   return (
-    <Card className="border-0 shadow-xl hover:shadow-2xl transition-shadow duration-300">
+    <Card className="border-0 shadow-xl hover:shadow-2xl transition-shadow duration-300 dark:bg-slate-800 dark:border-slate-700">
       <CardContent className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -102,12 +125,12 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
               <ShoppingCart className="w-6 h-6 text-white" />
             </div>
             <div>
-              <p className="font-bold text-slate-900 text-lg">
+              <p className="font-bold text-slate-900 dark:text-slate-100 text-lg">
                 Order #{order.order_number}
               </p>
               <div className="flex items-center gap-2 mt-1">
-                <Calendar className="w-3 h-3 text-slate-400" />
-                <p className="text-sm text-slate-600">
+                <Calendar className="w-3 h-3 text-slate-400 dark:text-slate-500" />
+                <p className="text-sm text-slate-600 dark:text-slate-400">
                   {format(new Date(order.order_date), 'MMM d, yyyy')}
                 </p>
               </div>
@@ -117,7 +140,7 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
             {getStatusBadge()}
             <Badge
               variant="secondary"
-              className={isEligible ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'}
+              className={isEligible ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}
             >
               {isEligible ? 'Rebate Ready' : 'Rebate Pending'}
             </Badge>
@@ -125,29 +148,29 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
         </div>
 
         <div className="grid grid-cols-3 gap-4 mb-4">
-          <div className="p-3 bg-slate-50 rounded-lg">
-            <p className="text-xs text-slate-600 mb-1">Order Total</p>
-            <p className="font-bold text-slate-900 text-lg">
+          <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+            <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Order Total</p>
+            <p className="font-bold text-slate-900 dark:text-slate-100 text-lg">
               Tsh {parseFloat(String(order.total_amount || 0)).toFixed(2)}
             </p>
           </div>
-          <div className="p-3 bg-green-50 rounded-lg">
-            <p className="text-xs text-green-700 mb-1">Rebate (1%)</p>
-            <p className="font-bold text-green-700 text-lg">
+          <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+            <p className="text-xs text-green-700 dark:text-green-400 mb-1">Rebate (1%)</p>
+            <p className="font-bold text-green-700 dark:text-green-400 text-lg">
               Tsh {parseFloat(String(order.rebate_amount || 0)).toFixed(2)}
             </p>
           </div>
-          <div className="p-3 bg-blue-50 rounded-lg">
-            <p className="text-xs text-blue-700 mb-1">Items</p>
-            <p className="font-bold text-blue-700 text-lg">
+          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+            <p className="text-xs text-blue-700 dark:text-blue-400 mb-1">Items</p>
+            <p className="font-bold text-blue-700 dark:text-blue-400 text-lg">
               {order.items?.length || 0}
             </p>
           </div>
         </div>
 
         {!isEligible && (
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
-            <p className="text-sm text-amber-800">
+          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg mb-4">
+            <p className="text-sm text-amber-800 dark:text-amber-200">
               <Clock className="w-4 h-4 inline mr-2" />
               Rebate available on {format(eligibleDate, 'MMMM d, yyyy')}
             </p>
@@ -155,18 +178,18 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
         )}
 
         {isLocked && (
-          <div className="p-4 bg-red-50 border-2 border-red-300 rounded-lg mb-4">
+          <div className="p-4 bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700 rounded-lg mb-4">
             <div className="flex items-start gap-3">
-              <Lock className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <Lock className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-red-900 mb-1">
+                <p className="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">
                   Order Locked
                 </p>
-                <p className="text-sm text-red-800">
-                  This order has been locked because it was not confirmed within 3 days. Please visit the office for further assistance.
+                <p className="text-sm text-red-800 dark:text-red-200">
+                  This order has been locked because it was not confirmed within {autoLockDays} day{autoLockDays !== 1 ? 's' : ''}. Please visit the office for further assistance.
                 </p>
                 {order.locked_date && (
-                  <p className="text-xs text-red-600 mt-2">
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-2">
                     Locked on: {format(new Date(order.locked_date), 'MMM d, yyyy')}
                   </p>
                 )}
@@ -176,19 +199,19 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
         )}
 
         {shouldShowReminder && (
-          <div className="p-4 bg-orange-50 border-2 border-orange-300 rounded-lg mb-4">
+          <div className="p-4 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-700 rounded-lg mb-4">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-orange-900 mb-1">
+                <p className="text-sm font-semibold text-orange-900 dark:text-orange-100 mb-1">
                   Reminder: Confirm Your Order
                 </p>
-                <p className="text-sm text-orange-800">
+                <p className="text-sm text-orange-800 dark:text-orange-200">
                   {daysUntilLock === 1 
                     ? "You have 1 day left to confirm this order. After that, it will be locked and you'll need to visit the office for assistance."
                     : `You have ${daysUntilLock} days left to confirm this order. After that, it will be locked and you'll need to visit the office for assistance.`}
                 </p>
-                <p className="text-xs text-orange-700 mt-2">
+                <p className="text-xs text-orange-700 dark:text-orange-300 mt-2">
                   Deadline: {format(lockDeadline, 'MMMM d, yyyy')}
                 </p>
               </div>
@@ -197,17 +220,17 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
         )}
 
         {order.items && order.items.length > 0 && (
-          <div className="mb-4 pt-4 border-t border-slate-100">
-            <p className="text-sm font-semibold text-slate-900 mb-3">Order Items</p>
+          <div className="mb-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Order Items</p>
             <div className="space-y-2">
               {order.items.map((item: any, index: number) => (
                 <div key={index} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
-                    <Package className="w-4 h-4 text-slate-400" />
-                    <span className="text-slate-900">{item.product_name}</span>
-                    <span className="text-slate-500">x{item.quantity}</span>
+                    <Package className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                    <span className="text-slate-900 dark:text-slate-100">{item.product_name}</span>
+                    <span className="text-slate-500 dark:text-slate-400">x{item.quantity}</span>
                   </div>
-                  <span className="font-medium text-slate-900">
+                  <span className="font-medium text-slate-900 dark:text-slate-100">
                     Tsh {parseFloat(String(item.total_price || 0)).toFixed(2)}
                   </span>
                 </div>
@@ -217,9 +240,9 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
         )}
 
         {order.customer_status === 'pending' && !isLocked && (
-          <div className="pt-4 border-t border-slate-100 space-y-3">
-            <p className="text-sm font-semibold text-slate-900">Confirm Order Details</p>
-            <p className="text-sm text-slate-600">
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-700 space-y-3">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Confirm Order Details</p>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
               Please review the order details above and confirm they are correct, or dispute if there are any issues.
             </p>
             
@@ -277,15 +300,15 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
         )}
 
         {order.customer_status !== 'pending' && order.customer_comment && (
-          <div className="pt-4 border-t border-slate-100">
-            <div className="p-3 bg-slate-50 rounded-lg">
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
+            <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
-                <MessageSquare className="w-4 h-4 text-slate-600" />
-                <p className="text-sm font-semibold text-slate-900">Customer Comment</p>
+                <MessageSquare className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Customer Comment</p>
               </div>
-              <p className="text-sm text-slate-700">{order.customer_comment}</p>
+              <p className="text-sm text-slate-700 dark:text-slate-300">{order.customer_comment}</p>
               {order.customer_confirmed_date && (
-                <p className="text-xs text-slate-500 mt-2">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
                   {format(new Date(order.customer_confirmed_date), 'MMM d, yyyy \'at\' h:mm a')}
                 </p>
               )}
