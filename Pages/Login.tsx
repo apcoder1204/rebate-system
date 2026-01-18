@@ -47,21 +47,43 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await User.login(email, password);
+      // Validate inputs before attempting login
+      if (!email || !password) {
+        showError("Please enter both email and password");
+        setLoading(false);
+        return;
+      }
+      
+      const userData = await User.login(email, password);
+      
+      // Validate user data was received
+      if (!userData || !userData.id) {
+        throw new Error('Invalid user data received');
+      }
+      
       showSuccess("Login successful! Welcome back.");
       
       // Reset activity timer
       resetActivityTimer();
       
       // Clear browser history to prevent back navigation
-      window.history.replaceState(null, "", routes.Dashboard);
+      // Defensive check for mobile browsers
+      try {
+        window.history.replaceState(null, "", routes.Dashboard);
+      } catch (err) {
+        console.warn('History replaceState failed:', err);
+      }
       
       // Navigate and prevent back button
       navigate(routes.Dashboard, { replace: true });
       
       // Push state again to prevent back navigation
       setTimeout(() => {
-        window.history.pushState(null, "", routes.Dashboard);
+        try {
+          window.history.pushState(null, "", routes.Dashboard);
+        } catch (err) {
+          console.warn('History pushState failed:', err);
+        }
       }, 100);
     } catch (error: any) {
       console.error('Login error:', error);
@@ -69,15 +91,18 @@ export default function LoginPage() {
       const errorMessage = error?.message || 'Unknown error occurred';
       if (errorMessage.includes('rate limit') || errorMessage.includes('Too many')) {
         showError("Too many login attempts. Please wait 15 minutes and try again.");
-      } else if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
-        showError("Cannot connect to server. Please check if the backend is running.");
-      } else if (errorMessage.includes('Invalid credentials') || errorMessage.includes('Invalid email')) {
+      } else if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError') || errorMessage.includes('Network request failed')) {
+        showError("Cannot connect to server. Please check your internet connection and try again.");
+      } else if (errorMessage.includes('Invalid credentials') || errorMessage.includes('Invalid email') || errorMessage.includes('Invalid password')) {
         showError("Invalid email or password");
+      } else if (errorMessage.includes('Invalid response') || errorMessage.includes('No authentication token') || errorMessage.includes('No user data')) {
+        showError("Server returned invalid data. Please try again or contact support.");
       } else {
         showError(errorMessage || "Login failed. Please try again.");
       }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (

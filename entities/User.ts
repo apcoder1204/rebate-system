@@ -54,15 +54,33 @@ export const User = {
       body: JSON.stringify({ email, password }),
     });
     
+    // Validate response structure
+    if (!response) {
+      throw new Error('Invalid response from server');
+    }
+    
+    if (!response.token) {
+      throw new Error('No authentication token received');
+    }
+    
+    if (!response.user) {
+      throw new Error('No user data received');
+    }
+    
+    // Validate required user fields
+    if (!response.user.id || !response.user.email || !response.user.full_name) {
+      throw new Error('Incomplete user data received');
+    }
+    
     setToken(response.token);
     
     const userData: UserType = {
       id: response.user.id,
       email: response.user.email,
       full_name: response.user.full_name,
-      role: response.user.role,
-      phone: response.user.phone,
-      created_date: response.user.created_date,
+      role: response.user.role || undefined,
+      phone: response.user.phone || undefined,
+      created_date: response.user.created_date || undefined,
     };
     
     localStorage.setItem(LS_KEY, JSON.stringify(userData));

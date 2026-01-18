@@ -77,7 +77,9 @@ export async function apiRequest(
     sessionStorage.clear();
     
     // Redirect to login if not already there
-    if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
+    // Defensive check for mobile browsers where pathname might be undefined
+    const pathname = window.location?.pathname || '';
+    if (pathname && !pathname.includes('/login') && !pathname.includes('/register')) {
       window.location.href = '/login';
     }
     
@@ -93,7 +95,12 @@ export async function apiRequest(
   if (!response.ok) {
     let error;
     try {
-      error = await response.json();
+      const text = await response.text();
+      try {
+        error = JSON.parse(text);
+      } catch {
+        error = { error: text || `HTTP error! status: ${response.status}` };
+      }
     } catch {
       error = { error: `HTTP error! status: ${response.status}` };
     }
@@ -101,7 +108,17 @@ export async function apiRequest(
     throw new Error(errorMessage);
   }
   
-  return response.json();
+  // Parse JSON response with error handling
+  try {
+    const text = await response.text();
+    if (!text || text.trim().length === 0) {
+      throw new Error('Empty response from server');
+    }
+    return JSON.parse(text);
+  } catch (error: any) {
+    console.error('Failed to parse JSON response:', error);
+    throw new Error('Invalid response format from server');
+  }
 }
 
 export async function apiUpload(
@@ -145,7 +162,9 @@ export async function apiUpload(
     sessionStorage.clear();
     
     // Redirect to login if not already there
-    if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
+    // Defensive check for mobile browsers where pathname might be undefined
+    const pathname = window.location?.pathname || '';
+    if (pathname && !pathname.includes('/login') && !pathname.includes('/register')) {
       window.location.href = '/login';
     }
     

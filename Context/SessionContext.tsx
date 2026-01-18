@@ -166,7 +166,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           routes.Settings,
         ];
 
-        if (protectedRoutes.includes(location.pathname)) {
+        // Defensive check for mobile browsers where pathname might be undefined
+        const pathname = location?.pathname || '';
+        if (pathname && protectedRoutes.includes(pathname)) {
           await logout();
         }
       }
@@ -189,7 +191,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       routes.Settings,
     ];
 
-    const isProtectedRoute = protectedRoutes.includes(location.pathname);
+    // Defensive check for mobile browsers where pathname might be undefined
+    const pathname = location?.pathname || '';
+    const isProtectedRoute = pathname && protectedRoutes.includes(pathname);
 
     if (isProtectedRoute && isAuthenticatedRef.current) {
       // Push current state to history to prevent back navigation
