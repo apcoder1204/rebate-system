@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/Components/ui/card";
 import { Badge } from "@/Components/ui/badge";
 import { Input } from "@/Components/ui/input";
 import { Button } from "@/Components/ui/button";
+import { Pagination } from "@/Components/ui/pagination";
 import { 
   Search, 
   Users as UsersIcon, 
@@ -27,7 +28,6 @@ export default function ManageUsers() {
   const [activeTab, setActiveTab] = useState<'users' | 'requests'>('users');
   const [users, setUsers] = useState<UserType[]>([]);
   const [roleRequests, setRoleRequests] = useState<any[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<UserType[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<UserType | null>(null);
@@ -35,7 +35,34 @@ export default function ManageUsers() {
   const [error, setError] = useState<string | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [togglingActive, setTogglingActive] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [roleFilter, setRoleFilter] = useState<string>("");
+  const [activeFilter, setActiveFilter] = useState<boolean | undefined>(undefined);
   const navigate = useNavigate();
+
+  const loadUsers = useCallback(async (currentPage: number, currentPageSize: number, search?: string, role?: string, isActive?: boolean) => {
+    try {
+      const response = await User.list(
+        {
+          role: role || undefined,
+          is_active: isActive,
+          search: search || undefined
+        },
+        currentPage,
+        currentPageSize
+      );
+      setUsers(response.data);
+      setTotal(response.pagination.total);
+      setTotalPages(response.pagination.totalPages);
+      setPage(response.pagination.page);
+      setPageSize(response.pagination.pageSize);
+    } catch (error) {
+      console.error("Error loading users:", error);
+    }
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
@@ -48,9 +75,7 @@ export default function ManageUsers() {
         return;
       }
       
-      const allUsers = await User.list();
-      setUsers(allUsers);
-      setFilteredUsers(allUsers);
+      await loadUsers(1, 20, undefined, undefined, undefined);
       
       // Load role requests if admin or manager
       if (['admin', 'manager'].includes(user.role || '')) {
@@ -62,27 +87,27 @@ export default function ManageUsers() {
         }
       }
     } catch (error) {
-      console.error("Error loading users:", error);
+      console.error("Error loading data:", error);
       navigate(createPageUrl('Home'));
     }
     setLoading(false);
-  }, [navigate]);
+  }, [navigate, loadUsers]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
+  // Debounce search
   useEffect(() => {
-    if (searchQuery) {
-      const filtered = users.filter(user =>
-        user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.email?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredUsers(filtered);
-    } else {
-      setFilteredUsers(users);
-    }
-  }, [searchQuery, users]);
+    if (activeTab !== 'users') return;
+    
+    const timer = setTimeout(() => {
+      setPage(1);
+      loadUsers(1, pageSize, searchQuery || undefined, roleFilter || undefined, activeFilter);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, roleFilter, activeFilter, activeTab, pageSize, loadUsers]);
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     setError(null);
@@ -103,7 +128,7 @@ export default function ManageUsers() {
       }
       
       await User.updateUserRole(userId, newRole);
-      await loadData(); // Reload data
+      await loadUsers(page, pageSize, searchQuery || undefined, roleFilter || undefined, activeFilter); // Reload data
       setEditingRole(null);
       showSuccess('User role updated successfully!');
     } catch (error: any) {
@@ -117,7 +142,7 @@ export default function ManageUsers() {
     
     try {
       await User.reviewRoleRequest(requestId, action);
-      await loadData(); // Reload data
+      await loadUsers(page, pageSize, searchQuery || undefined, roleFilter || undefined, activeFilter); // Reload data
       showSuccess(`Role request ${action}d successfully!`);
     } catch (error: any) {
       setError(error.message || `Failed to ${action} role request`);
@@ -180,7 +205,7 @@ export default function ManageUsers() {
     setError(null);
     try {
       await Admin.toggleUserActive(userId, !currentStatus);
-      await loadData();
+      await loadUsers(page, pageSize, searchQuery || undefined, roleFilter || undefined, activeFilter);
       showSuccess(`User ${!currentStatus ? 'activated' : 'deactivated'} successfully`);
     } catch (error: any) {
       setError(error.message || 'Failed to update user status');
@@ -189,6 +214,8 @@ export default function ManageUsers() {
   };
 
   const getRoleStats = () => {
+    // For stats, we need to fetch all users without filters
+    // For now, calculate from current page data (approximate)
     const admins = users.filter(u => u.role === 'admin').length;
     const managers = users.filter(u => u.role === 'manager').length;
     const staff = users.filter(u => u.role === 'staff').length;
@@ -298,24 +325,67 @@ export default function ManageUsers() {
 
         {/* Users Tab */}
         {activeTab === 'users' && (
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <CardTitle>All Users</CardTitle>
-                <div className="relative w-full md:w-64">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                  <Input
-                    placeholder="Search users..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
+          <>
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <CardTitle>All Users</CardTitle>
+                    <div className="relative w-full md:w-64">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                      <Input
+                        placeholder="Search users..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-4 items-center">
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-slate-600 dark:text-slate-400">Role:</label>
+                      <select
+                        value={roleFilter}
+                        onChange={(e) => {
+                          setRoleFilter(e.target.value);
+                          setPage(1);
+                        }}
+                        className="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-md text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      >
+                        <option value="">All</option>
+                        <option value="admin">Admin</option>
+                        <option value="manager">Manager</option>
+                        <option value="staff">Staff</option>
+                        <option value="user">Customer</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-slate-600 dark:text-slate-400">Status:</label>
+                      <select
+                        value={activeFilter === undefined ? '' : activeFilter ? 'active' : 'inactive'}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setActiveFilter(value === '' ? undefined : value === 'active');
+                          setPage(1);
+                        }}
+                        className="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-md text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      >
+                        <option value="">All</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {filteredUsers.map((user) => {
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {users.length === 0 ? (
+                    <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                      No users found
+                    </div>
+                  ) : (
+                    users.map((user) => {
                   const userRole = user.role || 'user';
                   let badgeColor = 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300';
                   if (userRole === 'admin') badgeColor = 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300';
@@ -440,10 +510,31 @@ export default function ManageUsers() {
                       </div>
                     </div>
                   );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+                    })
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+            {totalPages > 0 && (
+              <Card>
+                <Pagination
+                  page={page}
+                  pageSize={pageSize}
+                  total={total}
+                  totalPages={totalPages}
+                  onPageChange={(newPage) => {
+                    setPage(newPage);
+                    loadUsers(newPage, pageSize, searchQuery, roleFilter, activeFilter);
+                  }}
+                  onPageSizeChange={(newPageSize) => {
+                    setPageSize(newPageSize);
+                    setPage(1);
+                    loadUsers(1, newPageSize, searchQuery, roleFilter, activeFilter);
+                  }}
+                />
+              </Card>
+            )}
+          </>
         )}
 
         {/* Role Requests Tab */}

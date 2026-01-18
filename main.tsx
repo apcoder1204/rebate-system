@@ -16,6 +16,7 @@ import Profile from "./Pages/Profile";
 import ChangePassword from "./Pages/ChangePassword";
 import Settings from "./Pages/Settings";
 import SystemSettingsPage from "./Pages/SystemSettings";
+import Reports from "./Pages/Reports";
 import { routes } from "./utils";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { ToastProvider } from "./Context/ToastContext";
@@ -28,7 +29,12 @@ import "./styles.css";
 const App = () => (
   <ErrorBoundary>
     <ThemeProvider>
-      <BrowserRouter>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <ToastProvider>
           <SessionProvider>
             <Routes>
@@ -116,6 +122,14 @@ const App = () => (
             element={
               <ProtectedRoute requiredRole={['admin']}>
                 <Layout><SystemSettingsPage /></Layout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/reports"
+            element={
+              <ProtectedRoute requiredRole={['admin', 'manager']}>
+                <Layout><Reports /></Layout>
               </ProtectedRoute>
             } 
           />

@@ -66,6 +66,30 @@ primaryPool.on('error', (err) => {
     waitingCount: primaryPool.waitingCount,
   });
   // Don't exit - fallback to backup
+  // Prevent unhandled error event
+  if (err instanceof Error) {
+    // Mark error as handled
+    err.name = 'HandledPoolError';
+  }
+});
+
+// Handle client-level errors before they become unhandled
+primaryPool.on('connect', (client) => {
+  // Add error handler to each client to prevent unhandled errors
+  client.on('error', (err: Error) => {
+    console.error('⚠️  Client connection error (handled):', err.message);
+    // Mark error as handled to prevent unhandled error event
+    if (err.name !== 'HandledClientError') {
+      err.name = 'HandledClientError';
+    }
+    // Client will be automatically removed from pool by pg library
+    // Don't let this crash the process
+  });
+  
+  // Handle notice events
+  client.on('notice', (msg: any) => {
+    // Silently handle notices (they're informational)
+  });
 });
 
 // Handle connection removal (disconnections)
@@ -80,6 +104,20 @@ primaryPool.on('acquire', () => {
 
 backupPool.on('error', (err) => {
   console.error('❌ Backup database (localhost) error:', err.message);
+  // Prevent unhandled error event
+  if (err instanceof Error) {
+    err.name = 'HandledPoolError';
+  }
+});
+
+// Handle client-level errors for backup pool
+backupPool.on('connect', (client) => {
+  client.on('error', (err: Error) => {
+    console.error('⚠️  Backup client connection error (handled):', err.message);
+    if (err.name !== 'HandledClientError') {
+      err.name = 'HandledClientError';
+    }
+  });
 });
 
 // Test connections with retry logic
@@ -196,13 +234,41 @@ testConnections().then(() => {
   startConnectionWarmer(2); // Warm every 2 minutes
 });
 
+// Global error handler for unhandled errors
+process.on('uncaughtException', (error) => {
+  // Check if it's a database connection error that we should handle gracefully
+  if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || 
+      error.syscall === 'read' || error.message?.includes('connection')) {
+    console.error('⚠️  Unhandled database connection error (suppressed):', error.message);
+    // Don't crash - these are recoverable connection errors
+    return;
+  }
+  // For other uncaught exceptions, log and exit
+  console.error('❌ Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  // Check if it's a database connection error
+  if (reason && typeof reason === 'object' && 'code' in reason) {
+    const err = reason as any;
+    if (err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT' || 
+        err.syscall === 'read' || err.message?.includes('connection')) {
+      console.error('⚠️  Unhandled database connection rejection (suppressed):', err.message);
+      // Don't crash - these are recoverable connection errors
+      return;
+    }
+  }
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 // Graceful shutdown handler
 process.on('SIGINT', () => {
   isShuttingDown = true;
   if (healthCheckInterval) clearInterval(healthCheckInterval);
   if (connectionWarmerInterval) clearInterval(connectionWarmerInterval);
-  primaryPool.end();
-  backupPool.end();
+  primaryPool.end().catch(() => {});
+  backupPool.end().catch(() => {});
   process.exit(0);
 });
 
@@ -210,8 +276,8 @@ process.on('SIGTERM', () => {
   isShuttingDown = true;
   if (healthCheckInterval) clearInterval(healthCheckInterval);
   if (connectionWarmerInterval) clearInterval(connectionWarmerInterval);
-  primaryPool.end();
-  backupPool.end();
+  primaryPool.end().catch(() => {});
+  backupPool.end().catch(() => {});
   process.exit(0);
 });
 

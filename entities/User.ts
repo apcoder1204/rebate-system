@@ -1,4 +1,5 @@
 import { apiRequest, setToken } from "@/src/api/client";
+import { PaginatedResponse } from "./Order";
 
 export type UserType = {
   id: string;
@@ -36,8 +37,16 @@ export const User = {
       return JSON.parse(raw);
     }
   },
-  async list(): Promise<UserType[]> {
-    return apiRequest('/users/list');
+  async list(filters?: { role?: string; is_active?: boolean; search?: string }, page?: number, pageSize?: number): Promise<PaginatedResponse<UserType>> {
+    const params = new URLSearchParams();
+    if (filters?.role) params.append('role', filters.role);
+    if (filters?.is_active !== undefined) params.append('is_active', String(filters.is_active));
+    if (filters?.search) params.append('search', filters.search);
+    if (page) params.append('page', String(page));
+    if (pageSize) params.append('pageSize', String(pageSize));
+    
+    const query = params.toString();
+    return apiRequest(`/users/list${query ? `?${query}` : ''}`);
   },
   async login(email: string, password: string) {
     const response = await apiRequest('/users/login', {

@@ -1,4 +1,4 @@
-import { apiRequest } from "@/src/api/client";
+import { apiRequest, getToken } from "@/src/api/client";
 
 export type OrderItem = {
   id?: string;
@@ -32,16 +32,46 @@ export type OrderType = {
   manually_unlocked?: boolean;
 };
 
+export type PaginatedResponse<T> = {
+  data: T[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+export type OrderFilters = {
+  customer_id?: string;
+  customer_status?: string;
+  start_date?: string;
+  end_date?: string;
+  min_amount?: number;
+  max_amount?: number;
+};
+
 export const Order = {
-  async list(sortBy?: string): Promise<OrderType[]> {
-    const query = sortBy ? `?sortBy=${sortBy}` : '';
-    return apiRequest(`/orders${query}`);
+  async list(sortBy?: string, page?: number, pageSize?: number): Promise<PaginatedResponse<OrderType>> {
+    const params = new URLSearchParams();
+    if (sortBy) params.append('sortBy', sortBy);
+    if (page) params.append('page', String(page));
+    if (pageSize) params.append('pageSize', String(pageSize));
+    
+    const query = params.toString();
+    return apiRequest(`/orders${query ? `?${query}` : ''}`);
   },
-  async filter(filters: Partial<OrderType>, sortBy?: string): Promise<OrderType[]> {
+  async filter(filters: OrderFilters, sortBy?: string, page?: number, pageSize?: number): Promise<PaginatedResponse<OrderType>> {
     const params = new URLSearchParams();
     if (filters.customer_id) params.append('customer_id', filters.customer_id);
     if (filters.customer_status) params.append('customer_status', filters.customer_status);
+    if (filters.start_date) params.append('start_date', filters.start_date);
+    if (filters.end_date) params.append('end_date', filters.end_date);
+    if (filters.min_amount !== undefined) params.append('min_amount', String(filters.min_amount));
+    if (filters.max_amount !== undefined) params.append('max_amount', String(filters.max_amount));
     if (sortBy) params.append('sortBy', sortBy);
+    if (page) params.append('page', String(page));
+    if (pageSize) params.append('pageSize', String(pageSize));
     
     return apiRequest(`/orders/filter?${params.toString()}`);
   },
@@ -61,6 +91,40 @@ export const Order = {
     await apiRequest(`/orders/${id}`, {
       method: 'DELETE',
     });
+  },
+  async exportCSV(filters?: OrderFilters): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (filters?.customer_id) params.append('customer_id', filters.customer_id);
+    if (filters?.customer_status) params.append('customer_status', filters.customer_status);
+    if (filters?.start_date) params.append('start_date', filters.start_date);
+    if (filters?.end_date) params.append('end_date', filters.end_date);
+    
+    const token = getToken();
+    if (!token) {
+      throw new Error('No authentication token found. Please login again.');
+    }
+    
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+    
+    const headers: HeadersInit = {
+      'Authorization': `Bearer ${token}`,
+    };
+    
+    const response = await fetch(`${API_BASE_URL}/orders/export/csv?${params.toString()}`, {
+      headers,
+      credentials: 'include',
+    });
+    
+    if (response.status === 401) {
+      throw new Error('Session expired. Please login again.');
+    }
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Export failed' }));
+      throw new Error(error.error || 'Export failed');
+    }
+    
+    return response.blob();
   },
 };
 

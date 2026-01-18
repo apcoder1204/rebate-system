@@ -5,7 +5,7 @@ import pool from '../db/connection';
 import { AuthRequest } from '../middleware/auth';
 import * as twilioService from '../services/twilioService';
 import * as emailService from '../services/emailService';
-import { sanitizeString, isValidEmail, isValidPhone, isValidUUID, sanitizeNumber } from '../middleware/validation';
+import { sanitizeString, isValidEmail, isValidPhone, isValidUUID, sanitizeNumber, sanitizePagination, isValidRole } from '../middleware/validation';
 
 export const login = async (req: Request, res: Response) => {
   try {
@@ -334,11 +334,68 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
 
 export const listUsers = async (req: AuthRequest, res: Response) => {
   try {
-    const result = await pool.query(
-      'SELECT id, email, full_name, role, phone, created_date, is_active FROM users ORDER BY created_date DESC'
+    const { role, is_active, search } = req.query;
+    const { page, limit, offset } = sanitizePagination(
+      req.query.page as string | number | undefined,
+      req.query.pageSize as string | number | undefined
     );
     
-    res.json(result.rows);
+    // Build count query
+    let countQuery = 'SELECT COUNT(*) as total FROM users WHERE 1=1';
+    let query = 'SELECT id, email, full_name, role, phone, created_date, is_active FROM users WHERE 1=1';
+    
+    const params: any[] = [];
+    let paramCount = 1;
+    
+    // Role filtering
+    if (role && typeof role === 'string' && isValidRole(role)) {
+      query += ` AND role = $${paramCount}`;
+      countQuery += ` AND role = $${paramCount}`;
+      params.push(role);
+      paramCount++;
+    }
+    
+    // Active status filtering
+    if (is_active !== undefined) {
+      const isActiveValue = typeof is_active === 'string' ? is_active : String(is_active);
+      const isActive = isActiveValue === 'true' || isActiveValue === '1';
+      query += ` AND is_active = $${paramCount}`;
+      countQuery += ` AND is_active = $${paramCount}`;
+      params.push(isActive);
+      paramCount++;
+    }
+    
+    // Search filtering (name or email)
+    if (search && typeof search === 'string' && search.trim()) {
+      const searchTerm = `%${search.trim()}%`;
+      query += ` AND (full_name ILIKE $${paramCount} OR email ILIKE $${paramCount})`;
+      countQuery += ` AND (full_name ILIKE $${paramCount} OR email ILIKE $${paramCount})`;
+      params.push(searchTerm);
+      paramCount++;
+    }
+    
+    query += ' ORDER BY created_date DESC';
+    
+    // Add pagination
+    query += ` LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+    params.push(limit, offset);
+    
+    // Get total count
+    const countResult = await pool.query(countQuery, params.slice(0, paramCount - 1));
+    const total = parseInt(countResult.rows[0].total, 10);
+    
+    // Get paginated results
+    const result = await pool.query(query, params);
+    
+    res.json({
+      data: result.rows,
+      pagination: {
+        page,
+        pageSize: limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
   } catch (error) {
     console.error('List users error:', error);
     res.status(500).json({ error: 'Internal server error' });

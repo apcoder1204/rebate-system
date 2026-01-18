@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import pool from '../db/connection';
 import { AuthRequest } from '../middleware/auth';
-import { isValidUUID, sanitizeString, sanitizeNumber, sanitizeSortBy, isValidDate, isValidContractStatus } from '../middleware/validation';
+import { isValidUUID, sanitizeString, sanitizeNumber, sanitizeSortBy, isValidDate, isValidContractStatus, sanitizePagination } from '../middleware/validation';
 
 export const listContracts = async (req: AuthRequest, res: Response) => {
   try {
@@ -9,6 +9,12 @@ export const listContracts = async (req: AuthRequest, res: Response) => {
       req.query.sortBy as string,
       ['created_date', 'start_date', 'end_date'],
       'created_date'
+    );
+    
+    // Get pagination parameters
+    const { page, limit, offset } = sanitizePagination(
+      req.query.page as string | number | undefined,
+      req.query.pageSize as string | number | undefined
     );
     // Check if approved_by column exists before using it
     let hasApprovedByColumn = false;
@@ -51,6 +57,20 @@ export const listContracts = async (req: AuthRequest, res: Response) => {
       creator.full_name as creator_name`;
     }
     
+    // Build count query
+    let countQuery = `
+      SELECT COUNT(*) as total
+      FROM contracts c
+      LEFT JOIN users u ON c.customer_id = u.id
+    `;
+    if (hasApprovedByColumn) {
+      countQuery += ` LEFT JOIN users approver ON c.approved_by = approver.id`;
+    }
+    if (hasCreatedByColumn) {
+      countQuery += ` LEFT JOIN users creator ON c.created_by = creator.id`;
+    }
+    
+    // Build data query
     let query = `
       SELECT ${selectFields}
       FROM contracts c
@@ -64,19 +84,24 @@ export const listContracts = async (req: AuthRequest, res: Response) => {
     }
     
     const params: any[] = [];
+    let paramCount = 1;
     let hasWhere = false;
     
     // Apply role-based filtering
     if (req.user!.role === 'user') {
-      query += ' WHERE c.customer_id = $1';
+      query += ` WHERE c.customer_id = $${paramCount}`;
+      countQuery += ` WHERE c.customer_id = $${paramCount}`;
       params.push(req.user!.id);
+      paramCount++;
       hasWhere = true;
     } else if (req.user!.role === 'staff' && req.query.include_all !== 'true') {
       const clauses: string[] = [];
       clauses.push(`c.status IN ('pending', 'pending_approval')`);
-      clauses.push(`c.approved_by = $${params.length + 1}`);
+      clauses.push(`c.approved_by = $${paramCount}`);
       params.push(req.user!.id);
+      paramCount++;
       query += ` WHERE (${clauses.join(' OR ')})`;
+      countQuery += ` WHERE (${clauses.join(' OR ')})`;
       hasWhere = true;
     }
     
@@ -88,8 +113,26 @@ export const listContracts = async (req: AuthRequest, res: Response) => {
       query += ` ORDER BY c.${sortBy} ASC`;
     }
     
+    // Add pagination
+    query += ` LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+    params.push(limit, offset);
+    
+    // Get total count
+    const countResult = await pool.query(countQuery, params.slice(0, paramCount - 1));
+    const total = parseInt(countResult.rows[0].total, 10);
+    
+    // Get paginated results
     const result = await pool.query(query, params);
-    res.json(result.rows);
+    
+    res.json({
+      data: result.rows,
+      pagination: {
+        page,
+        pageSize: limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
   } catch (error) {
     console.error('List contracts error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -465,11 +508,17 @@ export const deleteContract = async (req: AuthRequest, res: Response) => {
 
 export const filterContracts = async (req: AuthRequest, res: Response) => {
   try {
-    const { customer_id, status } = req.query;
+    const { customer_id, status, start_date, end_date, min_rebate, max_rebate } = req.query;
     const sortBy = sanitizeSortBy(
       req.query.sortBy as string,
       ['created_date', 'start_date', 'end_date'],
       'created_date'
+    );
+    
+    // Get pagination parameters
+    const { page, limit, offset } = sanitizePagination(
+      req.query.page as string | number | undefined,
+      req.query.pageSize as string | number | undefined
     );
     
     // Check if approved_by column exists
@@ -513,6 +562,21 @@ export const filterContracts = async (req: AuthRequest, res: Response) => {
       creator.full_name as creator_name`;
     }
     
+    // Build count query
+    let countQuery = `
+      SELECT COUNT(*) as total
+      FROM contracts c
+      LEFT JOIN users u ON c.customer_id = u.id
+    `;
+    if (hasApprovedByColumn) {
+      countQuery += ` LEFT JOIN users approver ON c.approved_by = approver.id`;
+    }
+    if (hasCreatedByColumn) {
+      countQuery += ` LEFT JOIN users creator ON c.created_by = creator.id`;
+    }
+    countQuery += ` WHERE 1=1`;
+    
+    // Build data query
     let query = `
       SELECT ${selectFields}
       FROM contracts c
@@ -531,21 +595,27 @@ export const filterContracts = async (req: AuthRequest, res: Response) => {
     
     // Apply role-based filtering - IDOR protection
     if (req.user!.role === 'user') {
-      query += ` AND c.customer_id = $${paramCount++}`;
+      query += ` AND c.customer_id = $${paramCount}`;
+      countQuery += ` AND c.customer_id = $${paramCount}`;
       params.push(req.user!.id);
+      paramCount++;
     } else if (req.user!.role === 'staff') {
       const clauses: string[] = [];
       clauses.push(`c.status IN ('pending', 'pending_approval')`);
-      clauses.push(`c.approved_by = $${paramCount++}`);
+      clauses.push(`c.approved_by = $${paramCount}`);
       params.push(req.user!.id);
+      paramCount++;
       query += ` AND (${clauses.join(' OR ')})`;
+      countQuery += ` AND (${clauses.join(' OR ')})`;
     } else if (customer_id) {
       // Validate customer_id format for admin/manager/staff
       if (!isValidUUID(customer_id as string)) {
         return res.status(400).json({ error: 'Invalid customer ID format' });
       }
-      query += ` AND c.customer_id = $${paramCount++}`;
+      query += ` AND c.customer_id = $${paramCount}`;
+      countQuery += ` AND c.customer_id = $${paramCount}`;
       params.push(customer_id);
+      paramCount++;
     }
     
     if (status) {
@@ -553,8 +623,46 @@ export const filterContracts = async (req: AuthRequest, res: Response) => {
       if (!isValidContractStatus(status as string)) {
         return res.status(400).json({ error: 'Invalid contract status' });
       }
-      query += ` AND c.status = $${paramCount++}`;
+      query += ` AND c.status = $${paramCount}`;
+      countQuery += ` AND c.status = $${paramCount}`;
       params.push(status);
+      paramCount++;
+    }
+    
+    // Date range filtering
+    if (start_date && isValidDate(start_date as string)) {
+      query += ` AND c.start_date >= $${paramCount}`;
+      countQuery += ` AND c.start_date >= $${paramCount}`;
+      params.push(start_date);
+      paramCount++;
+    }
+    
+    if (end_date && isValidDate(end_date as string)) {
+      query += ` AND c.end_date <= $${paramCount}`;
+      countQuery += ` AND c.end_date <= $${paramCount}`;
+      params.push(end_date);
+      paramCount++;
+    }
+    
+    // Rebate percentage range filtering
+    if (min_rebate) {
+      const minRebate = sanitizeNumber(min_rebate, 0, 100);
+      if (minRebate !== null) {
+        query += ` AND c.rebate_percentage >= $${paramCount}`;
+        countQuery += ` AND c.rebate_percentage >= $${paramCount}`;
+        params.push(minRebate);
+        paramCount++;
+      }
+    }
+    
+    if (max_rebate) {
+      const maxRebate = sanitizeNumber(max_rebate, 0, 100);
+      if (maxRebate !== null) {
+        query += ` AND c.rebate_percentage <= $${paramCount}`;
+        countQuery += ` AND c.rebate_percentage <= $${paramCount}`;
+        params.push(maxRebate);
+        paramCount++;
+      }
     }
     
     // Safe sort by (whitelisted)
@@ -565,8 +673,26 @@ export const filterContracts = async (req: AuthRequest, res: Response) => {
       query += ` ORDER BY c.${sortBy} ASC`;
     }
     
+    // Add pagination
+    query += ` LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+    params.push(limit, offset);
+    
+    // Get total count
+    const countResult = await pool.query(countQuery, params.slice(0, paramCount - 1));
+    const total = parseInt(countResult.rows[0].total, 10);
+    
+    // Get paginated results
     const result = await pool.query(query, params);
-    res.json(result.rows);
+    
+    res.json({
+      data: result.rows,
+      pagination: {
+        page,
+        pageSize: limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
   } catch (error) {
     console.error('Filter contracts error:', error);
     res.status(500).json({ error: 'Internal server error' });

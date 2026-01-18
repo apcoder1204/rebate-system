@@ -13,6 +13,7 @@ import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { Combobox } from "@/Components/ui/combobox";
+import { CustomerCombobox } from "@/Components/ui/CustomerCombobox";
 import { Plus, Trash2, ShoppingCart } from "lucide-react";
 import { useToast } from "@/Context/ToastContext";
 
@@ -200,12 +201,6 @@ export default function CreateOrderDialog({
     return customer ? customer.full_name : customerId;
   };
 
-  const customerOptions = customers.map((c: any) => ({
-    value: c.id,
-    label: c.full_name || "Unknown Name",
-    subLabel: c.email
-  }));
-
   const contractOptions = availableContracts.map((c: any) => ({
     value: c.id,
     label: c.contract_number || "No Contract Number",
@@ -226,8 +221,7 @@ export default function CreateOrderDialog({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <Label htmlFor="customer_id">Customer *</Label>
-              <Combobox
-                options={customerOptions}
+              <CustomerCombobox
                 value={formData.customer_id}
                 onChange={(value) => setFormData(prev => ({ ...prev, customer_id: value, contract_id: "" }))}
                 placeholder="Select customer"

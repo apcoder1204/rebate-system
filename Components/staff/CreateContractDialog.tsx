@@ -12,7 +12,9 @@ import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { Combobox } from "@/Components/ui/combobox";
+import { CustomerCombobox } from "@/Components/ui/CustomerCombobox";
 import { Textarea } from "@/Components/ui/textarea";
+import { User } from "@/entities/User";
 import { FileText, AlertCircle, CheckCircle, Eye, EyeOff, Pencil } from "lucide-react";
 import ContractPreview from "./ContractPreview";
 
@@ -28,6 +30,7 @@ export default function CreateContractDialog({ open, onClose, onSuccess, custome
   const [submitting, setSubmitting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [isStatusEditing, setIsStatusEditing] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
 
   useEffect(() => {
     if (open) {
@@ -184,13 +187,25 @@ export default function CreateContractDialog({ open, onClose, onSuccess, custome
     setSubmitting(false);
   };
 
-  const selectedCustomer = customers.find((c: any) => c.id === formData.customer_id);
+  // Load selected customer when customer_id changes
+  useEffect(() => {
+    const loadCustomer = async () => {
+      if (formData.customer_id) {
+        try {
+          const response = await User.list(undefined, 1, 100);
+          const customer = response.data.find((u: any) => u.id === formData.customer_id);
+          setSelectedCustomer(customer || null);
+        } catch (error) {
+          console.error('Error loading customer:', error);
+          setSelectedCustomer(null);
+        }
+      } else {
+        setSelectedCustomer(null);
+      }
+    };
+    loadCustomer();
+  }, [formData.customer_id]);
 
-  const customerOptions = customers.map((c: any) => ({
-    value: c.id,
-    label: c.full_name || "Unknown Name",
-    subLabel: c.email
-  }));
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -227,8 +242,7 @@ export default function CreateContractDialog({ open, onClose, onSuccess, custome
             {/* Customer Selection */}
             <div>
               <Label htmlFor="customer_id">Customer *</Label>
-              <Combobox 
-                options={customerOptions}
+              <CustomerCombobox 
                 value={formData.customer_id}
                 onChange={(value) => handleSelectChange("customer_id", value)}
                 disabled={!!editingContract}
@@ -239,11 +253,6 @@ export default function CreateContractDialog({ open, onClose, onSuccess, custome
                 <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
                   <AlertCircle className="w-4 h-4" />
                   {errors.customer_id}
-                </p>
-              )}
-              {selectedCustomer && (
-                <p className="text-sm text-slate-600 mt-1">
-                  {selectedCustomer.phone && `Phone: ${selectedCustomer.phone}`}
                 </p>
               )}
             </div>

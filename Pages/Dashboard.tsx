@@ -37,17 +37,17 @@ export default function Dashboard() {
       setUser(currentUser);
 
       if (currentUser.role === 'admin') {
-        const allContracts = await Contract.list('-created_date');
-        const allOrders = await Order.list('-order_date');
-        console.log("Admin data - contracts:", allContracts, "orders:", allOrders);
-        setContracts(allContracts);
-        setOrders(allOrders);
+        const contractsResponse = await Contract.list('-created_date', undefined, 1, 100);
+        const ordersResponse = await Order.list('-order_date', 1, 100);
+        console.log("Admin data - contracts:", contractsResponse, "orders:", ordersResponse);
+        setContracts(contractsResponse.data);
+        setOrders(ordersResponse.data);
       } else {
-        const userContracts = await Contract.filter({ customer_id: currentUser.id });
-        const userOrders = await Order.filter({ customer_id: currentUser.id }, '-order_date');
-        console.log("User data - contracts:", userContracts, "orders:", userOrders);
-        setContracts(userContracts);
-        setOrders(userOrders);
+        const userContractsResponse = await Contract.filter({ customer_id: currentUser.id }, undefined, 1, 100);
+        const userOrdersResponse = await Order.filter({ customer_id: currentUser.id }, '-order_date', 1, 100);
+        console.log("User data - contracts:", userContractsResponse, "orders:", userOrdersResponse);
+        setContracts(userContractsResponse.data);
+        setOrders(userOrdersResponse.data);
       }
     } catch (error) {
       console.error("Error loading dashboard data:", error);

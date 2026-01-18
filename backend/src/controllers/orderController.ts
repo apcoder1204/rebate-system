@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import pool from '../db/connection';
 import { AuthRequest } from '../middleware/auth';
-import { isValidUUID, sanitizeString, sanitizeNumber, sanitizeSortBy, isValidDate, isValidOrderStatus } from '../middleware/validation';
+import { isValidUUID, sanitizeString, sanitizeNumber, sanitizeSortBy, isValidDate, isValidOrderStatus, sanitizePagination } from '../middleware/validation';
 
 import { SystemSettings } from '../services/systemSettings';
 
@@ -11,6 +11,12 @@ export const listOrders = async (req: AuthRequest, res: Response) => {
       req.query.sortBy as string,
       ['order_date', 'created_date', 'total_amount'],
       'order_date'
+    );
+    
+    // Get pagination parameters
+    const { page, limit, offset } = sanitizePagination(
+      req.query.page as string | number | undefined,
+      req.query.pageSize as string | number | undefined
     );
     
     // Get auto-lock days from settings
@@ -27,6 +33,15 @@ export const listOrders = async (req: AuthRequest, res: Response) => {
         AND manually_unlocked = FALSE
     `, [autoLockDays]);
 
+    // Build base query for counting
+    let countQuery = `
+      SELECT COUNT(*) as total
+      FROM orders o
+      LEFT JOIN users u ON o.customer_id = u.id
+      LEFT JOIN contracts c ON o.contract_id = c.id
+    `;
+    
+    // Build data query
     let query = `
       SELECT 
         o.*,
@@ -39,11 +54,14 @@ export const listOrders = async (req: AuthRequest, res: Response) => {
     `;
     
     const params: any[] = [];
+    let paramCount = 1;
     
     // Apply role-based filtering
     if (req.user!.role === 'user') {
-      query += ' WHERE o.customer_id = $1';
+      query += ` WHERE o.customer_id = $${paramCount}`;
+      countQuery += ` WHERE o.customer_id = $${paramCount}`;
       params.push(req.user!.id);
+      paramCount++;
     }
     
     // Safe sort by (whitelisted)
@@ -54,6 +72,15 @@ export const listOrders = async (req: AuthRequest, res: Response) => {
       query += ` ORDER BY o.${sortBy} ASC`;
     }
     
+    // Add pagination
+    query += ` LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+    params.push(limit, offset);
+    
+    // Get total count
+    const countResult = await pool.query(countQuery, params.slice(0, paramCount - 1));
+    const total = parseInt(countResult.rows[0].total, 10);
+    
+    // Get paginated results
     const result = await pool.query(query, params);
     
     // Fetch order items for each order
@@ -70,7 +97,15 @@ export const listOrders = async (req: AuthRequest, res: Response) => {
       })
     );
     
-    res.json(ordersWithItems);
+    res.json({
+      data: ordersWithItems,
+      pagination: {
+        page,
+        pageSize: limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
   } catch (error) {
     console.error('List orders error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -552,11 +587,17 @@ export const deleteOrder = async (req: AuthRequest, res: Response) => {
 
 export const filterOrders = async (req: AuthRequest, res: Response) => {
   try {
-    const { customer_id, customer_status } = req.query;
+    const { customer_id, customer_status, start_date, end_date, min_amount, max_amount } = req.query;
     const sortBy = sanitizeSortBy(
       req.query.sortBy as string,
       ['order_date', 'created_date', 'total_amount'],
       'order_date'
+    );
+    
+    // Get pagination parameters
+    const { page, limit, offset } = sanitizePagination(
+      req.query.page as string | number | undefined,
+      req.query.pageSize as string | number | undefined
     );
     
     // Get auto-lock days from settings
@@ -572,6 +613,17 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
         AND manually_unlocked = FALSE
     `, [autoLockDays]);
 
+    // Build base query for counting
+    let countQuery = `
+      SELECT COUNT(*) as total
+      FROM orders o
+      LEFT JOIN users u ON o.customer_id = u.id
+      LEFT JOIN contracts c ON o.contract_id = c.id
+      LEFT JOIN users creator ON o.created_by = creator.id
+      WHERE 1=1
+    `;
+    
+    // Build data query
     let query = `
       SELECT 
         o.*,
@@ -591,18 +643,24 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
     
     // Apply role-based filtering - IDOR protection
     if (req.user!.role === 'user') {
-      query += ` AND o.customer_id = $${paramCount++}`;
+      query += ` AND o.customer_id = $${paramCount}`;
+      countQuery += ` AND o.customer_id = $${paramCount}`;
       params.push(req.user!.id);
+      paramCount++;
     } else if (req.user!.role === 'staff') {
-      query += ` AND o.created_by = $${paramCount++}`;
+      query += ` AND o.created_by = $${paramCount}`;
+      countQuery += ` AND o.created_by = $${paramCount}`;
       params.push(req.user!.id);
+      paramCount++;
     } else if (customer_id) {
       // Validate customer_id format for admin/manager/staff
       if (!isValidUUID(customer_id as string)) {
         return res.status(400).json({ error: 'Invalid customer ID format' });
       }
-      query += ` AND o.customer_id = $${paramCount++}`;
+      query += ` AND o.customer_id = $${paramCount}`;
+      countQuery += ` AND o.customer_id = $${paramCount}`;
       params.push(customer_id);
+      paramCount++;
     }
     
     if (customer_status) {
@@ -610,8 +668,46 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
       if (!isValidOrderStatus(customer_status as string)) {
         return res.status(400).json({ error: 'Invalid order status' });
       }
-      query += ` AND o.customer_status = $${paramCount++}`;
+      query += ` AND o.customer_status = $${paramCount}`;
+      countQuery += ` AND o.customer_status = $${paramCount}`;
       params.push(customer_status);
+      paramCount++;
+    }
+    
+    // Date range filtering
+    if (start_date && isValidDate(start_date as string)) {
+      query += ` AND o.order_date >= $${paramCount}`;
+      countQuery += ` AND o.order_date >= $${paramCount}`;
+      params.push(start_date);
+      paramCount++;
+    }
+    
+    if (end_date && isValidDate(end_date as string)) {
+      query += ` AND o.order_date <= $${paramCount}`;
+      countQuery += ` AND o.order_date <= $${paramCount}`;
+      params.push(end_date);
+      paramCount++;
+    }
+    
+    // Amount range filtering
+    if (min_amount) {
+      const minAmount = sanitizeNumber(min_amount, 0);
+      if (minAmount !== null) {
+        query += ` AND o.total_amount >= $${paramCount}`;
+        countQuery += ` AND o.total_amount >= $${paramCount}`;
+        params.push(minAmount);
+        paramCount++;
+      }
+    }
+    
+    if (max_amount) {
+      const maxAmount = sanitizeNumber(max_amount, 0);
+      if (maxAmount !== null) {
+        query += ` AND o.total_amount <= $${paramCount}`;
+        countQuery += ` AND o.total_amount <= $${paramCount}`;
+        params.push(maxAmount);
+        paramCount++;
+      }
     }
     
     // Safe sort by (whitelisted)
@@ -622,6 +718,15 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
       query += ` ORDER BY o.${sortBy} ASC`;
     }
     
+    // Add pagination
+    query += ` LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+    params.push(limit, offset);
+    
+    // Get total count
+    const countResult = await pool.query(countQuery, params.slice(0, paramCount - 1));
+    const total = parseInt(countResult.rows[0].total, 10);
+    
+    // Get paginated results
     const result = await pool.query(query, params);
     
     // Fetch order items for each order
@@ -638,7 +743,15 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
       })
     );
     
-    res.json(ordersWithItems);
+    res.json({
+      data: ordersWithItems,
+      pagination: {
+        page,
+        pageSize: limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
   } catch (error) {
     console.error('Filter orders error:', error);
     res.status(500).json({ error: 'Internal server error' });

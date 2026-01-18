@@ -7,6 +7,7 @@ import { Input } from "@/Components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/Components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/Components/ui/tabs";
 import { Combobox } from "@/Components/ui/combobox";
+import { CustomerCombobox } from "@/Components/ui/CustomerCombobox";
 import { useToast } from "@/Context/ToastContext";
 import { Settings, Activity, Save, RefreshCw, AlertTriangle, Calculator, DollarSign, ShoppingCart } from "lucide-react";
 import { format } from "date-fns";
@@ -48,7 +49,7 @@ export default function SystemSettingsPage() {
       }
       setCurrentUserRole(user.role);
 
-      const [settingsData, logsData, allUsers] = await Promise.all([
+      const [settingsData, logsData, allUsersResponse] = await Promise.all([
         Admin.getSettings(),
         Admin.getLogs(50),
         User.list()
@@ -58,6 +59,7 @@ export default function SystemSettingsPage() {
       setLogs(logsData);
       
       // Filter customers (users who are not admin, manager, or staff)
+      const allUsers = allUsersResponse.data || [];
       const customerUsers = allUsers.filter(u => !['admin', 'manager', 'staff'].includes(u.role || 'user'));
       setCustomers(customerUsers);
       
@@ -101,7 +103,8 @@ export default function SystemSettingsPage() {
 
     setLoadingRebate(true);
     try {
-      const orders = await Order.filter({ customer_id: selectedCustomerId });
+      const ordersResponse = await Order.filter({ customer_id: selectedCustomerId }, undefined, 1, 1000);
+      const orders = ordersResponse.data;
       const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
       
       const totalOrders = orders.length;
@@ -273,12 +276,7 @@ export default function SystemSettingsPage() {
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                         Select Customer
                       </label>
-                      <Combobox
-                        options={customers.map((c: any) => ({
-                          value: c.id,
-                          label: c.full_name || "Unknown Name",
-                          subLabel: c.email
-                        }))}
+                      <CustomerCombobox
                         value={selectedCustomerId}
                         onChange={setSelectedCustomerId}
                         placeholder="Select a customer to calculate rebate"

@@ -53,6 +53,35 @@ export const Admin = {
       method: 'PUT',
       body: JSON.stringify({ is_active: isActive }),
     });
+  },
+
+  async getRevenueReport(startDate?: string, endDate?: string): Promise<any> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    return apiRequest(`/admin/reports/revenue?${params.toString()}`);
+  },
+
+  async getOrderTrends(startDate?: string, endDate?: string, groupBy: 'day' | 'week' | 'month' = 'day'): Promise<any> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    params.append('group_by', groupBy);
+    return apiRequest(`/admin/reports/order-trends?${params.toString()}`);
+  },
+
+  async getCustomerStats(startDate?: string, endDate?: string): Promise<any> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    return apiRequest(`/admin/reports/customer-stats?${params.toString()}`);
+  },
+
+  async getSummaryStats(startDate?: string, endDate?: string): Promise<any> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    return apiRequest(`/admin/reports/summary?${params.toString()}`);
   }
 };
 

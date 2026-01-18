@@ -115,3 +115,23 @@ export function sanitizeSortBy(sortBy: string, allowedFields: string[], defaultS
   return defaultSort;
 }
 
+/**
+ * Sanitize and validate pagination parameters
+ */
+export function sanitizePagination(page?: string | number, pageSize?: string | number): { limit: number; offset: number; page: number } {
+  const DEFAULT_PAGE_SIZE = 20;
+  const MAX_PAGE_SIZE = 100;
+  const MIN_PAGE_SIZE = 5;
+  
+  const pageNum = typeof page === 'string' ? parseInt(page, 10) : (page || 1);
+  const size = typeof pageSize === 'string' ? parseInt(pageSize, 10) : (pageSize || DEFAULT_PAGE_SIZE);
+  
+  const sanitizedPage = Math.max(1, isNaN(pageNum) ? 1 : pageNum);
+  const sanitizedSize = Math.max(MIN_PAGE_SIZE, Math.min(MAX_PAGE_SIZE, isNaN(size) ? DEFAULT_PAGE_SIZE : size));
+  
+  return {
+    page: sanitizedPage,
+    limit: sanitizedSize,
+    offset: (sanitizedPage - 1) * sanitizedSize
+  };
+}

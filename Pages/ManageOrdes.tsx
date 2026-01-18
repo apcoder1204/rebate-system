@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { User } from "@/entities/User";
-import { Order } from "@/entities/Order";
+import { Order, OrderFilters } from "@/entities/Order";
 import { Contract } from "@/entities/Contract";
 import { Button } from "@/Components/ui/button";
 import { Combobox } from "@/Components/ui/combobox";
-import { Plus, Filter, AlertCircle, Lock } from "lucide-react";
+import { CustomerCombobox } from "@/Components/ui/CustomerCombobox";
+import { Plus, Filter, AlertCircle, Lock, Download } from "lucide-react";
 import { createPageUrl } from "@/utils";
 import { useNavigate } from "react-router-dom";
+import { Pagination } from "@/Components/ui/pagination";
 
 import OrdersList from "@/Components/staff/OrdersList";
 import CreateOrderDialog from "@/Components/staff/CreateOrderDialog";
@@ -25,16 +27,24 @@ export default function ManageOrders() {
   const [filterCustomerId, setFilterCustomerId] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const navigate = useNavigate();
 
-  const loadOrders = useCallback(async (customerId?: string, status?: string) => {
-    const filters: any = {};
+  const loadOrders = useCallback(async (customerId?: string, status?: string, currentPage?: number, currentPageSize?: number) => {
+    const filters: OrderFilters = {};
     if (customerId && customerId !== 'all') filters.customer_id = customerId;
     if (status && status !== 'all') filters.customer_status = status;
 
-    const allOrders = await Order.filter(filters, '-order_date');
-    setOrders(allOrders as never[]);
-  }, []);
+    const response = await Order.filter(filters, '-order_date', currentPage || page, currentPageSize || pageSize);
+    setOrders(response.data as never[]);
+    setTotal(response.pagination.total);
+    setTotalPages(response.pagination.totalPages);
+    setPage(response.pagination.page);
+    setPageSize(response.pagination.pageSize);
+  }, [page, pageSize]);
 
   const loadData = useCallback(async () => {
     try {
@@ -48,9 +58,10 @@ export default function ManageOrders() {
       setCurrentUserRole(userRole);
       setCurrentUserId(user.id);
 
-      const allContracts = await Contract.list(undefined, { includeAll: true });
-      const allUsers = await User.list();
-      const customerUsers = allUsers.filter(u => !['admin', 'manager', 'staff'].includes(u.role || 'user')); 
+      const contractsResponse = await Contract.list(undefined, { includeAll: true });
+      const allContracts = contractsResponse.data;
+      const allUsersResponse = await User.list();
+      const customerUsers = allUsersResponse.data.filter(u => !['admin', 'manager', 'staff'].includes(u.role || 'user')); 
       
       setContracts(allContracts as never[]);
       setCustomers(customerUsers as never[]);
@@ -68,9 +79,9 @@ export default function ManageOrders() {
   }, [loadData]);
 
   useEffect(() => {
-    // Refresh orders when filters change
-    loadOrders(filterCustomerId, filterStatus);
-  }, [filterCustomerId, filterStatus, loadOrders]);
+    // Refresh orders when filters or pagination change
+    loadOrders(filterCustomerId, filterStatus, page, pageSize);
+  }, [filterCustomerId, filterStatus, page, pageSize, loadOrders]);
 
   const handleEdit = (order: any) => {
     const isOwner = order.created_by === currentUserId;
@@ -186,18 +197,11 @@ export default function ManageOrders() {
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Filter by Customer
                 </label>
-                <Combobox
-                  options={[
-                    { value: "all", label: "All customers" },
-                    ...customers.map((c: any) => ({
-                      value: c.id,
-                      label: c.full_name || "Unknown Name",
-                      subLabel: c.email
-                    }))
-                  ]}
+                <CustomerCombobox
                   value={filterCustomerId}
                   onChange={setFilterCustomerId}
                   placeholder="All customers"
+                  includeAll={true}
                 />
               </div>
               
@@ -218,17 +222,46 @@ export default function ManageOrders() {
                 />
               </div>
               
-              <div>
+              <div className="flex gap-2">
                 <Button 
                   variant="outline" 
                   className="w-full md:w-auto" 
                   onClick={() => { 
                     setFilterCustomerId("all"); 
-                    setFilterStatus("all"); 
+                    setFilterStatus("all");
+                    setPage(1);
+                    loadOrders("all", "all", 1, pageSize);
                   }}
                 >
                   <Filter className="w-4 h-4 mr-2" />
                   Reset Filters
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full md:w-auto" 
+                  onClick={async () => {
+                    try {
+                      const filters: OrderFilters = {};
+                      if (filterCustomerId && filterCustomerId !== 'all') filters.customer_id = filterCustomerId;
+                      if (filterStatus && filterStatus !== 'all') filters.customer_status = filterStatus;
+                      
+                      const blob = await Order.exportCSV(filters);
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `orders_${new Date().toISOString().split('T')[0]}.csv`;
+                      document.body.appendChild(a);
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                      document.body.removeChild(a);
+                    } catch (error) {
+                      console.error('Export failed:', error);
+                      alert('Failed to export orders. Please try again.');
+                    }
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export CSV
                 </Button>
               </div>
             </div>
@@ -237,12 +270,35 @@ export default function ManageOrders() {
 
         <OrdersList 
           orders={orders} 
-          onRefresh={() => loadOrders(filterCustomerId, filterStatus)}
+          onRefresh={() => {
+            setPage(1);
+            loadOrders(filterCustomerId, filterStatus, 1, pageSize);
+          }}
           onEdit={handleEdit}
           canEdit={canEdit}
           currentUserRole={currentUserRole || undefined}
           currentUserId={currentUserId || undefined}
         />
+
+        {totalPages > 0 && (
+          <Card>
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={total}
+              totalPages={totalPages}
+              onPageChange={(newPage) => {
+                setPage(newPage);
+                loadOrders(filterCustomerId, filterStatus, newPage, pageSize);
+              }}
+              onPageSizeChange={(newPageSize) => {
+                setPageSize(newPageSize);
+                setPage(1);
+                loadOrders(filterCustomerId, filterStatus, 1, newPageSize);
+              }}
+            />
+          </Card>
+        )}
 
         <CreateOrderDialog
           open={showCreateDialog}
