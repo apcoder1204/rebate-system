@@ -2,7 +2,7 @@ import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { User } from "@/entities/User";
-import { FileText, ShoppingCart, LayoutDashboard, Users, LogOut, Menu, FileSignature, Settings } from "lucide-react";
+import { FileText, ShoppingCart, LayoutDashboard, Users, LogOut, Menu, FileSignature, Settings, TrendingUp } from "lucide-react";
 import { useSession } from "@/Context/SessionContext";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -68,6 +68,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
     if (["admin", "manager"].includes(userRole)) {
       items.push({ title: "Users", url: createPageUrl("ManageUsers" as any), icon: Users });
+      items.push({ title: "Reports", url: "/reports", icon: TrendingUp });
     }
 
     if (userRole === 'admin') {
