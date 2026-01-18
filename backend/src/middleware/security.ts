@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import helmet from 'helmet';
 import jwt from 'jsonwebtoken';
 
@@ -32,7 +32,9 @@ export const authRateLimit = rateLimit({
   skipSuccessfulRequests: true,
   keyGenerator: (req) => {
     const email = typeof req.body?.email === 'string' ? req.body.email.toLowerCase() : '';
-    return `${req.ip}:${email}`;
+    // Use ipKeyGenerator helper for IPv6 compatibility
+    const ip = ipKeyGenerator(req);
+    return `${ip}:${email}`;
   },
   skip: (req) => {
     // Skip rate limiting for localhost in development
@@ -66,7 +68,8 @@ export const apiRateLimit = rateLimit({
         // Invalid token, fall back to IP
       }
     }
-    return req.ip; // Fall back to IP for unauthenticated requests
+    // Use ipKeyGenerator helper for IPv6 compatibility
+    return ipKeyGenerator(req); // Fall back to IP for unauthenticated requests
   },
   skipSuccessfulRequests: false, // Count all requests
 });
