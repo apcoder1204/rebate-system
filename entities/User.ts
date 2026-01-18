@@ -46,7 +46,42 @@ export const User = {
     if (pageSize) params.append('pageSize', String(pageSize));
     
     const query = params.toString();
-    return apiRequest(`/users/list${query ? `?${query}` : ''}`);
+    const response = await apiRequest(`/users/list${query ? `?${query}` : ''}`);
+    
+    // Validate response structure
+    if (!response) {
+      throw new Error('No response received from server');
+    }
+    
+    // Ensure response has the expected structure
+    if (!response.data || !Array.isArray(response.data)) {
+      console.error('Invalid response structure:', response);
+      return {
+        data: [],
+        pagination: {
+          page: page || 1,
+          pageSize: pageSize || 20,
+          total: 0,
+          totalPages: 0
+        }
+      };
+    }
+    
+    // Ensure pagination object exists
+    if (!response.pagination) {
+      console.warn('Missing pagination in response, using defaults');
+      return {
+        data: response.data,
+        pagination: {
+          page: page || 1,
+          pageSize: pageSize || 20,
+          total: response.data.length,
+          totalPages: 1
+        }
+      };
+    }
+    
+    return response;
   },
   async login(email: string, password: string) {
     const response = await apiRequest('/users/login', {

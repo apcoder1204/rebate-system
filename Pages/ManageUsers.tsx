@@ -54,15 +54,46 @@ export default function ManageUsers() {
         currentPage,
         currentPageSize
       );
+      
+      // Defensive checks for response structure
+      if (!response) {
+        console.error("Error loading users: No response received");
+        setUsers([]);
+        setTotal(0);
+        setTotalPages(0);
+        return;
+      }
+      
+      // Validate response structure
+      if (!response.data || !Array.isArray(response.data)) {
+        console.error("Error loading users: Invalid response data structure", response);
+        setUsers([]);
+        setTotal(0);
+        setTotalPages(0);
+        return;
+      }
+      
+      if (!response.pagination) {
+        console.error("Error loading users: Missing pagination in response", response);
+        setUsers(response.data || []);
+        setTotal(response.data?.length || 0);
+        setTotalPages(1);
+        return;
+      }
+      
       setUsers(response.data);
-      setTotal(response.pagination.total);
-      setTotalPages(response.pagination.totalPages);
-      setPage(response.pagination.page);
-      setPageSize(response.pagination.pageSize);
+      setTotal(response.pagination.total || 0);
+      setTotalPages(response.pagination.totalPages || 1);
+      setPage(response.pagination.page || currentPage);
+      setPageSize(response.pagination.pageSize || currentPageSize);
     } catch (error) {
       console.error("Error loading users:", error);
+      setUsers([]);
+      setTotal(0);
+      setTotalPages(0);
+      showError("Failed to load users. Please try again.");
     }
-  }, []);
+  }, [showError]);
 
   const loadData = useCallback(async () => {
     try {
@@ -81,9 +112,11 @@ export default function ManageUsers() {
       if (['admin', 'manager'].includes(user.role || '')) {
         try {
           const requests = await User.getRoleRequests('pending');
-          setRoleRequests(requests);
+          // Defensive check for requests array
+          setRoleRequests(Array.isArray(requests) ? requests : []);
         } catch (err) {
           console.error("Error loading role requests:", err);
+          setRoleRequests([]);
         }
       }
     } catch (error) {
@@ -216,6 +249,10 @@ export default function ManageUsers() {
   const getRoleStats = () => {
     // For stats, we need to fetch all users without filters
     // For now, calculate from current page data (approximate)
+    // Defensive check for undefined users array
+    if (!users || !Array.isArray(users)) {
+      return { admins: 0, managers: 0, staff: 0, customers: 0 };
+    }
     const admins = users.filter(u => u.role === 'admin').length;
     const managers = users.filter(u => u.role === 'manager').length;
     const staff = users.filter(u => u.role === 'staff').length;
