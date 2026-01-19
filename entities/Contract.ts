@@ -35,6 +35,57 @@ export type ContractFilters = {
   max_rebate?: number;
 };
 
+function buildDefaultPagination(length: number, page?: number, pageSize?: number) {
+  const safePage = page || 1;
+  const safePageSize = pageSize || length || 20;
+  return {
+    page: safePage,
+    pageSize: safePageSize,
+    total: length,
+    totalPages: length === 0 ? 0 : 1,
+  };
+}
+
+function normalizeContractResponse(
+  response: any,
+  page?: number,
+  pageSize?: number
+): PaginatedResponse<ContractType> {
+  // Backend might return bare array in some environments
+  if (Array.isArray(response)) {
+    return {
+      data: response as ContractType[],
+      pagination: buildDefaultPagination(response.length, page, pageSize),
+    };
+  }
+
+  if (!response) {
+    console.error("Contract API error: empty response");
+    return {
+      data: [],
+      pagination: buildDefaultPagination(0, page, pageSize),
+    };
+  }
+
+  if (!Array.isArray(response.data)) {
+    console.error("Contract API error: invalid response structure", response);
+    return {
+      data: [],
+      pagination: buildDefaultPagination(0, page, pageSize),
+    };
+  }
+
+  if (!response.pagination) {
+    console.warn("Contract API warning: missing pagination, using defaults", response);
+    return {
+      data: response.data as ContractType[],
+      pagination: buildDefaultPagination(response.data.length, page, pageSize),
+    };
+  }
+
+  return response as PaginatedResponse<ContractType>;
+}
+
 export const Contract = {
   async list(sortBy?: string, options?: { includeAll?: boolean }, page?: number, pageSize?: number): Promise<PaginatedResponse<ContractType>> {
     const params = new URLSearchParams();
@@ -43,7 +94,8 @@ export const Contract = {
     if (page) params.append('page', String(page));
     if (pageSize) params.append('pageSize', String(pageSize));
     const query = params.toString() ? `?${params.toString()}` : '';
-    return apiRequest(`/contracts${query}`);
+    const response = await apiRequest(`/contracts${query}`);
+    return normalizeContractResponse(response, page, pageSize);
   },
   async create(data: Partial<ContractType>): Promise<ContractType> {
     return apiRequest('/contracts', {
@@ -63,7 +115,8 @@ export const Contract = {
     if (page) params.append('page', String(page));
     if (pageSize) params.append('pageSize', String(pageSize));
     
-    return apiRequest(`/contracts/filter?${params.toString()}`);
+    const response = await apiRequest(`/contracts/filter?${params.toString()}`);
+    return normalizeContractResponse(response, page, pageSize);
   },
   async update(id: string, data: Partial<ContractType>): Promise<ContractType> {
     return apiRequest(`/contracts/${id}`, {

@@ -39,11 +39,19 @@ export default function ManageOrders() {
     if (status && status !== 'all') filters.customer_status = status;
 
     const response = await Order.filter(filters, '-order_date', currentPage || page, currentPageSize || pageSize);
-    setOrders(response.data as never[]);
-    setTotal(response.pagination.total);
-    setTotalPages(response.pagination.totalPages);
-    setPage(response.pagination.page);
-    setPageSize(response.pagination.pageSize);
+    const data = Array.isArray(response?.data) ? response.data : [];
+    const pagination = response?.pagination || {
+      page: currentPage || page,
+      pageSize: currentPageSize || pageSize,
+      total: data.length,
+      totalPages: data.length === 0 ? 0 : 1,
+    };
+
+    setOrders(data as never[]);
+    setTotal(pagination.total);
+    setTotalPages(pagination.totalPages);
+    setPage(pagination.page);
+    setPageSize(pagination.pageSize);
   }, [page, pageSize]);
 
   const loadData = useCallback(async () => {

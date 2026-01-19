@@ -42,9 +42,10 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
       loadUser();
     }
   }, [canApprove]);
+ 
+  const safeContracts = Array.isArray(contracts) ? contracts : [];
 
-
-  const filteredContracts = contracts.filter((contract: any) =>
+  const filteredContracts = safeContracts.filter((contract: any) =>
     contract.contract_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     contract.customer_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     contract.customer_email?.toLowerCase().includes(searchQuery.toLowerCase())

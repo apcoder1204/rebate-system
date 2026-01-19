@@ -104,7 +104,7 @@ export default function SystemSettingsPage() {
     setLoadingRebate(true);
     try {
       const ordersResponse = await Order.filter({ customer_id: selectedCustomerId }, undefined, 1, 1000);
-      const orders = ordersResponse.data;
+      const orders = Array.isArray(ordersResponse?.data) ? ordersResponse.data : [];
       const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
       
       const totalOrders = orders.length;

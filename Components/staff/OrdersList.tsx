@@ -21,6 +21,7 @@ interface OrdersListProps {
 export default function OrdersList({ orders, onRefresh, onEdit, canEdit, currentUserRole, currentUserId }: OrdersListProps) {
   const { showSuccess, showError, showWarning } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const safeOrders = Array.isArray(orders) ? orders : [];
 
   const handleDownload = (order: any) => {
     const doc = new jsPDF();
@@ -69,7 +70,7 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
     doc.save(filename);
   };
 
-  const filteredOrders = orders.filter((order: any) =>
+  const filteredOrders = safeOrders.filter((order: any) =>
     order.order_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     order.customer_id?.toLowerCase().includes(searchQuery.toLowerCase())
   );
