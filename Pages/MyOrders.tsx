@@ -61,10 +61,11 @@ export default function MyOrders() {
       setUser(currentUser);
       
       console.log("Loading orders for customer:", currentUser.id);
-      const userOrders = await Order.filter({ customer_id: currentUser.id }, '-order_date');
-      console.log("Orders loaded:", userOrders);
+      const userOrdersResponse = await Order.filter({ customer_id: currentUser.id }, '-order_date');
+      console.log("Orders loaded:", userOrdersResponse);
       
-      setOrders(userOrders);
+      const safeOrders = Array.isArray(userOrdersResponse?.data) ? userOrdersResponse.data : [];
+      setOrders(safeOrders as never[]);
     } catch (error) {
       console.error("Error loading orders:", error);
       navigate(createPageUrl("Home"));

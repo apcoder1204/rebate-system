@@ -41,8 +41,9 @@ export default function MyContracts() {
         return;
       }
       setUser(currentUser);
-      const userContracts = await Contract.filter({ customer_id: currentUser.id }, '-created_date');
-      setContracts(userContracts);
+      const userContractsResponse = await Contract.filter({ customer_id: currentUser.id }, '-created_date');
+      const safeContracts = Array.isArray(userContractsResponse?.data) ? userContractsResponse.data : [];
+      setContracts(safeContracts as any[]);
     } catch (error) {
       console.error("Error loading contracts:", error);
       navigate(createPageUrl("Home"));
