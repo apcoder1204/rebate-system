@@ -5,7 +5,7 @@ import { Calendar, DollarSign, Clock, CheckCircle } from "lucide-react";
 import { format, addMonths, isAfter } from "date-fns";
 
 interface RebateTimelineProps {
-  orders: Array<{
+  orders?: Array<{
     id: string;
     order_number: string;
     order_date: string;
@@ -16,6 +16,8 @@ interface RebateTimelineProps {
 }
 
 export default function RebateTimeline({ orders }: RebateTimelineProps) {
+  const safeOrders = Array.isArray(orders) ? orders : [];
+
   const getRebateStatus = (order: any) => {
     const eligibleDate = addMonths(new Date(order.order_date), 6);
     const isEligible = isAfter(new Date(), eligibleDate);
@@ -53,14 +55,14 @@ export default function RebateTimeline({ orders }: RebateTimelineProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {orders.length === 0 ? (
+        {safeOrders.length === 0 ? (
           <div className="text-center py-8 text-slate-500 dark:text-slate-400">
             <Calendar className="w-12 h-12 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
             <p>No orders found</p>
           </div>
         ) : (
           <div className="space-y-4">
-            {orders.slice(0, 5).map((order) => {
+            {safeOrders.slice(0, 5).map((order) => {
               const rebateStatus = getRebateStatus(order);
               const eligibleDate = addMonths(new Date(order.order_date), 6);
               

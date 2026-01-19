@@ -14,10 +14,12 @@ interface ActivityItem {
 }
 
 interface RecentActivityProps {
-  activities: ActivityItem[];
+  activities?: ActivityItem[];
 }
 
 export default function RecentActivity({ activities }: RecentActivityProps) {
+  const safeActivities = Array.isArray(activities) ? activities : [];
+
   const getActivityIcon = (type: string) => {
     switch (type) {
       case 'contract':
@@ -53,14 +55,14 @@ export default function RecentActivity({ activities }: RecentActivityProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {activities.length === 0 ? (
+        {safeActivities.length === 0 ? (
           <div className="text-center py-8 text-slate-500 dark:text-slate-400">
             <Clock className="w-12 h-12 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
             <p>No recent activity</p>
           </div>
         ) : (
           <div className="space-y-4">
-            {activities.map((activity) => (
+            {safeActivities.map((activity) => (
               <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                 <div className="w-8 h-8 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
                   {getActivityIcon(activity.type)}

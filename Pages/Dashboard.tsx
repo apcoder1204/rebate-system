@@ -29,6 +29,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  const ensureArray = <T,>(value: any): T[] => (Array.isArray(value) ? value : []);
+
   const loadData = useCallback(async () => {
     try {
       console.log("Loading dashboard data...");
@@ -40,14 +42,14 @@ export default function Dashboard() {
         const contractsResponse = await Contract.list('-created_date', undefined, 1, 100);
         const ordersResponse = await Order.list('-order_date', 1, 100);
         console.log("Admin data - contracts:", contractsResponse, "orders:", ordersResponse);
-        setContracts(contractsResponse.data);
-        setOrders(ordersResponse.data);
+        setContracts(ensureArray(contractsResponse?.data));
+        setOrders(ensureArray(ordersResponse?.data));
       } else {
         const userContractsResponse = await Contract.filter({ customer_id: currentUser.id }, undefined, 1, 100);
         const userOrdersResponse = await Order.filter({ customer_id: currentUser.id }, '-order_date', 1, 100);
         console.log("User data - contracts:", userContractsResponse, "orders:", userOrdersResponse);
-        setContracts(userContractsResponse.data);
-        setOrders(userOrdersResponse.data);
+        setContracts(ensureArray(userContractsResponse?.data));
+        setOrders(ensureArray(userOrdersResponse?.data));
       }
     } catch (error) {
       console.error("Error loading dashboard data:", error);
@@ -62,23 +64,26 @@ export default function Dashboard() {
   }, [loadData]);
 
   const calculateStats = () => {
-    const totalOrders = orders.length;
-    const totalSpent = orders.reduce((sum, order) => sum + (parseFloat(String(order.total_amount || 0))), 0);
+    const safeOrders = ensureArray<any>(orders);
+    const safeContracts = ensureArray<any>(contracts);
+
+    const totalOrders = safeOrders.length;
+    const totalSpent = safeOrders.reduce((sum, order) => sum + (parseFloat(String(order.total_amount || 0))), 0);
     
-    const eligibleOrders = orders.filter(order => {
+    const eligibleOrders = safeOrders.filter(order => {
       const eligibleDate = addMonths(new Date(order.order_date), 6);
       return isAfter(new Date(), eligibleDate);
     });
     
     const eligibleRebate = eligibleOrders.reduce((sum, order) => sum + (parseFloat(String(order.rebate_amount || 0))), 0);
-    const pendingRebate = orders.reduce((sum, order) => sum + (parseFloat(String(order.rebate_amount || 0))), 0) - eligibleRebate;
+    const pendingRebate = safeOrders.reduce((sum, order) => sum + (parseFloat(String(order.rebate_amount || 0))), 0) - eligibleRebate;
 
     return {
       totalOrders,
       totalSpent,
       eligibleRebate,
       pendingRebate,
-      activeContracts: contracts.filter(c => c.status === 'active').length
+      activeContracts: safeContracts.filter(c => c.status === 'active').length
     };
   };
 
@@ -90,7 +95,7 @@ export default function Dashboard() {
 
   // Create activities from orders and contracts
   const activities = [
-    ...orders.slice(0, 5).map(order => ({
+    ...ensureArray<any>(orders).slice(0, 5).map(order => ({
       id: order.id,
       type: 'order' as const,
       title: `Order #${order.order_number}`,
@@ -98,7 +103,7 @@ export default function Dashboard() {
       timestamp: order.order_date,
       status: order.customer_status
     })),
-    ...contracts.slice(0, 3).map(contract => ({
+    ...ensureArray<any>(contracts).slice(0, 3).map(contract => ({
       id: contract.id,
       type: 'contract' as const,
       title: `Contract #${contract.contract_number || contract.id}`,
