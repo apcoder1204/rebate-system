@@ -17,6 +17,50 @@ const SessionContext = createContext<SessionContextType | undefined>(undefined);
 const SESSION_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
 const WARNING_TIME = 3 * 60 * 1000; // Show warning 3 minutes before timeout
 
+// ============================================================
+// MAINTENANCE MODE
+// Toggle via Vite env var:
+// - VITE_MAINTENANCE_MODE=true  (enabled)
+// - VITE_MAINTENANCE_MODE=false (disabled)
+//
+// IMPORTANT: Remember to disable/comment this after maintenance.
+// ============================================================
+const MAINTENANCE_MODE =
+  (import.meta as any)?.env?.VITE_MAINTENANCE_MODE === "true";
+
+function MaintenanceOverlay({ onLogout }: { onLogout: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="w-full max-w-xl rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800">
+        <div className="p-6 md:p-8 space-y-4">
+          <div>
+            <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100">
+              Taarifa ya Matengenezo
+            </h2>
+            <p className="mt-2 text-slate-700 dark:text-slate-300 leading-relaxed">
+              Mfumo upo kwenye matengenezo kwa siku chache. Kwa sasa huwezi kufanya
+              shughuli nyingine yoyote. Tafadhali <span className="font-semibold">toka (logout)</span> na
+              ujaribu tena baada ya matengenezo kukamilika.
+            </p>
+            <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
+              Asante kwa uvumilivu wako.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              onClick={onLogout}
+              className="inline-flex items-center justify-center h-10 px-4 rounded-md bg-red-600 hover:bg-red-700 text-white font-medium"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -237,6 +281,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
+      {MAINTENANCE_MODE && isAuthenticatedRef.current && (
+        <MaintenanceOverlay onLogout={() => logout()} />
+      )}
     </SessionContext.Provider>
   );
 }
