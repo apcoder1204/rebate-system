@@ -8,114 +8,60 @@ const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
+const node_cron_1 = __importDefault(require("node-cron"));
 const routes_1 = __importDefault(require("./routes"));
 const security_1 = require("./middleware/security");
+const orderReminderService_1 = require("./services/orderReminderService");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3000;
 // Security middleware (must be first)
 app.use(security_1.securityHeaders);
-// CORS configuration - Allow all necessary origins and methods
-// Normalize URLs: if no protocol specified, add https:// (and also allow http:// for flexibility)
-const normalizeOrigins = (urls) => {
-    const normalized = [];
-    urls.forEach(url => {
-        url = url.trim();
-        if (!url.startsWith('http://') && !url.startsWith('https://')) {
-            // If no protocol, add both http and https versions
-            normalized.push(`https://${url}`);
-            normalized.push(`http://${url}`);
-        }
-        else {
-            normalized.push(url);
-        }
-    });
-    return normalized;
-};
-const defaultOrigins = ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:4173', 'http://127.0.0.1:5173', 'http://127.0.0.1:3000', 'http://127.0.0.1:4173'];
-const allowedOrigins = process.env.FRONTEND_URL
-    ? normalizeOrigins(process.env.FRONTEND_URL.split(','))
-    : defaultOrigins;
-console.log(`🌐 CORS Configuration:`);
-console.log(`   Allowed Origins: ${allowedOrigins.join(', ')}`);
-console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
-console.log(`   Credentials: enabled`);
-// CORS configuration for production (Vercel frontend + Render backend)
+// Prevent caching of API responses
+app.use((req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    next();
+});
+// CORS configuration
+const allowedOrigins = [
+    'https://rebate.cctvpoint.org', // Production Frontend
+    'http://localhost:5173', // Local Frontend
+    'http://localhost:3000', // Local Backend/API
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000'
+];
+if (process.env.FRONTEND_URL) {
+    allowedOrigins.push(process.env.FRONTEND_URL);
+}
 app.use((0, cors_1.default)({
     origin: (origin, callback) => {
-        // Log all CORS requests for debugging
-        console.log(`🔍 CORS Request from origin: ${origin || 'no-origin'}`);
-        // Allow requests with no origin (like mobile apps, Postman, or curl)
-        if (!origin) {
-            console.log('✅ Allowing request with no origin');
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin)
             return callback(null, true);
-        }
-        // Always allow cctvpoint.org subdomains (for production)
-        if (origin.includes('cctvpoint.org')) {
-            console.log(`✅ Allowing cctvpoint.org subdomain: ${origin}`);
-            return callback(null, true);
-        }
-        // Check if origin is in allowed list (from FRONTEND_URL env var)
-        const isAllowed = allowedOrigins.some(allowed => {
-            // Exact match
-            if (allowed === origin) {
-                console.log(`✅ Exact match found: ${origin}`);
-                return true;
-            }
-            // Domain match
-            try {
-                const originUrl = new URL(origin);
-                const allowedUrl = new URL(allowed);
-                const hostnameMatch = originUrl.hostname === allowedUrl.hostname;
-                if (hostnameMatch) {
-                    console.log(`✅ Hostname match: ${originUrl.hostname} === ${allowedUrl.hostname}`);
-                }
-                return hostnameMatch;
-            }
-            catch (e) {
-                return false;
-            }
-        });
+        // Check against allowed origins
+        const isAllowed = allowedOrigins.indexOf(origin) !== -1 ||
+            process.env.NODE_ENV !== 'production' ||
+            origin.endsWith('.vercel.app') || // Allow all Vercel preview deployments
+            origin.endsWith('.cctvpoint.org'); // Allow all subdomains
         if (isAllowed) {
             callback(null, true);
         }
         else {
-            // In development, allow all origins for easier testing
-            if (process.env.NODE_ENV !== 'production') {
-                console.log(`✅ Development mode - allowing origin: ${origin}`);
-                callback(null, true);
-            }
-            else {
-                console.warn(`⚠️  CORS blocked origin: ${origin}`);
-                console.warn(`⚠️  Allowed origins: ${allowedOrigins.join(', ')}`);
-                // Still allow in production for now to debug - remove this after confirming it works
-                console.log(`⚠️  Temporarily allowing for debugging`);
-                callback(null, true);
-            }
+            console.warn(`⚠️  CORS Warning: Origin ${origin} not explicitly allowed, but allowing for debugging.`);
+            // Temporarily allow all for debugging 405 error
+            callback(null, true);
         }
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: [
-        'Content-Type',
-        'Authorization',
-        'X-Requested-With',
-        'Accept',
-        'Origin',
-        'Access-Control-Allow-Headers',
-        'Access-Control-Request-Method',
-        'Access-Control-Request-Headers'
-    ],
-    exposedHeaders: ['Content-Range', 'X-Content-Range'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Cache-Control', 'Pragma'],
     optionsSuccessStatus: 200,
-    maxAge: 86400, // 24 hours
-    preflightContinue: false, // Let cors handle preflight
 }));
-// Log CORS headers middleware (for debugging) - must be after CORS
+// Request logging middleware
 app.use((req, res, next) => {
-    if (req.method === 'OPTIONS' || req.headers.origin) {
-        console.log(`📡 ${req.method} ${req.path} - Origin: ${req.headers.origin || 'none'}`);
-    }
+    console.log(`📝 ${req.method} ${req.path} - Origin: ${req.headers.origin || 'unknown'}`);
     next();
 });
 // Body parsing with size limits
@@ -134,20 +80,18 @@ app.use('/uploads', express_1.default.static(uploadsRoot));
 // API routes
 app.use('/api', routes_1.default);
 // Health check endpoints (for Render and monitoring)
+app.get('/', (req, res) => {
+    res.json({
+        service: 'Rebate System API',
+        status: 'running',
+        timestamp: new Date().toISOString()
+    });
+});
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-// CORS test endpoint
-app.get('/api/cors-test', (req, res) => {
-    res.json({
-        status: 'ok',
-        message: 'CORS is working!',
-        origin: req.headers.origin || 'no-origin',
-        timestamp: new Date().toISOString()
-    });
 });
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -159,4 +103,23 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`📊 Health check: http://localhost:${PORT}/health`);
+    // Schedule order reminder emails to run every 7 days at 9:00 AM
+    // Cron format: minute hour day month day-of-week
+    // This runs at 9:00 AM every Sunday
+    // Note: To run every 7 days regardless of day, you might want to use a different approach
+    // For now, this runs weekly on Sundays. You can change '0' to any day (0=Sunday, 1=Monday, etc.)
+    node_cron_1.default.schedule('0 9 * * 0', async () => {
+        console.log('📧 Running scheduled order reminder job...');
+        try {
+            const result = await (0, orderReminderService_1.sendOrderReminders)();
+            console.log(`📧 Order reminder job completed: ${result.message}`);
+        }
+        catch (error) {
+            console.error('❌ Error in scheduled order reminder job:', error);
+        }
+    }, {
+        scheduled: true,
+        timezone: "Africa/Dar_es_Salaam" // Adjust to your timezone
+    });
+    console.log('📧 Order reminder scheduler initialized (runs every Sunday at 9:00 AM)');
 });

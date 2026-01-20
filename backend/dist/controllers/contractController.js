@@ -9,6 +9,8 @@ const validation_1 = require("../middleware/validation");
 const listContracts = async (req, res) => {
     try {
         const sortBy = (0, validation_1.sanitizeSortBy)(req.query.sortBy, ['created_date', 'start_date', 'end_date'], 'created_date');
+        // Get pagination parameters
+        const { page, limit, offset } = (0, validation_1.sanitizePagination)(req.query.page, req.query.pageSize);
         // Check if approved_by column exists before using it
         let hasApprovedByColumn = false;
         try {
@@ -22,34 +24,77 @@ const listContracts = async (req, res) => {
         catch (e) {
             // Column check failed, assume it doesn't exist
         }
-        let query = `
-      SELECT 
-        c.*,
-        u.full_name as customer_name,
-        u.email as customer_email,
-        u.phone as customer_phone
+        // Check if created_by column exists before using it
+        let hasCreatedByColumn = false;
+        try {
+            const columnCheck = await connection_1.default.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name='contracts' AND column_name='created_by'
+      `);
+            hasCreatedByColumn = columnCheck.rows.length > 0;
+        }
+        catch (e) {
+            // Column check failed, assume it doesn't exist
+        }
+        let selectFields = `
+      c.*,
+      u.full_name as customer_name,
+      u.email as customer_email,
+      u.phone as customer_phone
+    `;
+        if (hasApprovedByColumn) {
+            selectFields += `,
+      approver.full_name as approver_name`;
+        }
+        if (hasCreatedByColumn) {
+            selectFields += `,
+      creator.full_name as creator_name`;
+        }
+        // Build count query
+        let countQuery = `
+      SELECT COUNT(*) as total
       FROM contracts c
       LEFT JOIN users u ON c.customer_id = u.id
     `;
-        // Add approver join only if column exists
         if (hasApprovedByColumn) {
-            query = `
-        SELECT 
-          c.*,
-          u.full_name as customer_name,
-          u.email as customer_email,
-          u.phone as customer_phone,
-          approver.full_name as approver_name
-        FROM contracts c
-        LEFT JOIN users u ON c.customer_id = u.id
-        LEFT JOIN users approver ON c.approved_by = approver.id
-      `;
+            countQuery += ` LEFT JOIN users approver ON c.approved_by = approver.id`;
+        }
+        if (hasCreatedByColumn) {
+            countQuery += ` LEFT JOIN users creator ON c.created_by = creator.id`;
+        }
+        // Build data query
+        let query = `
+      SELECT ${selectFields}
+      FROM contracts c
+      LEFT JOIN users u ON c.customer_id = u.id
+    `;
+        if (hasApprovedByColumn) {
+            query += ` LEFT JOIN users approver ON c.approved_by = approver.id`;
+        }
+        if (hasCreatedByColumn) {
+            query += ` LEFT JOIN users creator ON c.created_by = creator.id`;
         }
         const params = [];
+        let paramCount = 1;
+        let hasWhere = false;
         // Apply role-based filtering
         if (req.user.role === 'user') {
-            query += ' WHERE c.customer_id = $1';
+            query += ` WHERE c.customer_id = $${paramCount}`;
+            countQuery += ` WHERE c.customer_id = $${paramCount}`;
             params.push(req.user.id);
+            paramCount++;
+            hasWhere = true;
+        }
+        else if (req.user.role === 'staff' && req.query.include_all !== 'true') {
+            const clauses = [];
+            clauses.push(`c.status IN ('pending', 'pending_approval')`);
+            clauses.push(`c.approved_by = $${paramCount}`);
+            params.push(req.user.id);
+            paramCount++;
+            query += ` WHERE (${clauses.join(' OR ')})`;
+            countQuery += ` WHERE (${clauses.join(' OR ')})`;
+            hasWhere = true;
         }
         // Safe sort by (whitelisted)
         if (sortBy.startsWith('-')) {
@@ -59,8 +104,23 @@ const listContracts = async (req, res) => {
         else {
             query += ` ORDER BY c.${sortBy} ASC`;
         }
+        // Add pagination
+        query += ` LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+        params.push(limit, offset);
+        // Get total count
+        const countResult = await connection_1.default.query(countQuery, params.slice(0, paramCount - 1));
+        const total = parseInt(countResult.rows[0].total, 10);
+        // Get paginated results
         const result = await connection_1.default.query(query, params);
-        res.json(result.rows);
+        res.json({
+            data: result.rows,
+            pagination: {
+                page,
+                pageSize: limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
     }
     catch (error) {
         console.error('List contracts error:', error);
@@ -88,30 +148,45 @@ const getContract = async (req, res) => {
         catch (e) {
             // Column check failed
         }
-        let getQuery = `
-      SELECT 
-        c.*,
-        u.full_name as customer_name,
-        u.email as customer_email,
-        u.phone as customer_phone
-      FROM contracts c
-      LEFT JOIN users u ON c.customer_id = u.id
-      WHERE c.id = $1
+        // Check if created_by column exists
+        let hasCreatedByColumn = false;
+        try {
+            const columnCheck = await connection_1.default.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name='contracts' AND column_name='created_by'
+      `);
+            hasCreatedByColumn = columnCheck.rows.length > 0;
+        }
+        catch (e) {
+            // Column check failed
+        }
+        let getSelect = `
+      c.*,
+      u.full_name as customer_name,
+      u.email as customer_email,
+      u.phone as customer_phone
     `;
         if (hasApprovedByColumn) {
-            getQuery = `
-        SELECT 
-          c.*,
-          u.full_name as customer_name,
-          u.email as customer_email,
-          u.phone as customer_phone,
-          approver.full_name as approver_name
-        FROM contracts c
-        LEFT JOIN users u ON c.customer_id = u.id
-        LEFT JOIN users approver ON c.approved_by = approver.id
-        WHERE c.id = $1
-      `;
+            getSelect += `,
+      approver.full_name as approver_name`;
         }
+        if (hasCreatedByColumn) {
+            getSelect += `,
+      creator.full_name as creator_name`;
+        }
+        let getQuery = `
+      SELECT ${getSelect}
+      FROM contracts c
+      LEFT JOIN users u ON c.customer_id = u.id
+    `;
+        if (hasApprovedByColumn) {
+            getQuery += ` LEFT JOIN users approver ON c.approved_by = approver.id`;
+        }
+        if (hasCreatedByColumn) {
+            getQuery += ` LEFT JOIN users creator ON c.created_by = creator.id`;
+        }
+        getQuery += ` WHERE c.id = $1`;
         const result = await connection_1.default.query(getQuery, [id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Contract not found' });
@@ -266,30 +341,9 @@ const updateContract = async (req, res) => {
         if (approved_by !== undefined && !(0, validation_1.isValidUUID)(approved_by)) {
             return res.status(400).json({ error: 'Invalid approver ID format' });
         }
-        // Check permissions
-        // Admins can modify anything
-        // Managers can only approve contracts (update manager fields and status)
-        if (req.user.role !== 'admin') {
-            if (req.user.role === 'manager') {
-                // Managers can only update approval-related fields
-                const allowedFields = ['status', 'manager_signature_data_url', 'manager_name', 'manager_position', 'approved_by'];
-                const requestedFields = Object.keys(req.body).filter(key => req.body[key] !== undefined &&
-                    !['start_date', 'end_date', 'rebate_percentage', 'signed_contract_url'].includes(key));
-                const hasUnauthorizedFields = requestedFields.some(field => !allowedFields.includes(field));
-                if (hasUnauthorizedFields) {
-                    return res.status(403).json({ error: 'Managers can only approve contracts, not modify other fields' });
-                }
-                // Only allow approval if contract is pending_approval
-                if (status && status !== 'approved' && status !== 'active' && status !== 'rejected') {
-                    return res.status(403).json({ error: 'Managers can only approve, activate, or reject contracts' });
-                }
-                if (contract.status !== 'pending_approval' && status && ['approved', 'active', 'rejected'].includes(status)) {
-                    return res.status(403).json({ error: 'Can only approve contracts that are pending approval' });
-                }
-            }
-            else {
-                return res.status(403).json({ error: 'Only admins and managers can modify contracts' });
-            }
+        // Check permissions: allow admin, manager, and staff to modify contracts
+        if (!['admin', 'manager', 'staff'].includes(req.user.role)) {
+            return res.status(403).json({ error: 'Only admins, managers and staff can modify contracts' });
         }
         // Whitelist of allowed column names to prevent SQL injection
         const updates = [];
@@ -381,8 +435,10 @@ const deleteContract = async (req, res) => {
 exports.deleteContract = deleteContract;
 const filterContracts = async (req, res) => {
     try {
-        const { customer_id, status } = req.query;
+        const { customer_id, status, start_date, end_date, min_rebate, max_rebate } = req.query;
         const sortBy = (0, validation_1.sanitizeSortBy)(req.query.sortBy, ['created_date', 'start_date', 'end_date'], 'created_date');
+        // Get pagination parameters
+        const { page, limit, offset } = (0, validation_1.sanitizePagination)(req.query.page, req.query.pageSize);
         // Check if approved_by column exists
         let hasApprovedByColumn = false;
         try {
@@ -396,52 +452,128 @@ const filterContracts = async (req, res) => {
         catch (e) {
             // Column check failed
         }
-        let query = `
-      SELECT 
-        c.*,
-        u.full_name as customer_name,
-        u.email as customer_email,
-        u.phone as customer_phone
-      FROM contracts c
-      LEFT JOIN users u ON c.customer_id = u.id
-      WHERE 1=1
+        // Check if created_by column exists
+        let hasCreatedByColumn = false;
+        try {
+            const columnCheck = await connection_1.default.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name='contracts' AND column_name='created_by'
+      `);
+            hasCreatedByColumn = columnCheck.rows.length > 0;
+        }
+        catch (e) {
+            // Column check failed
+        }
+        let selectFields = `
+      c.*,
+      u.full_name as customer_name,
+      u.email as customer_email,
+      u.phone as customer_phone
     `;
         if (hasApprovedByColumn) {
-            query = `
-        SELECT 
-          c.*,
-          u.full_name as customer_name,
-          u.email as customer_email,
-          u.phone as customer_phone,
-          approver.full_name as approver_name
-        FROM contracts c
-        LEFT JOIN users u ON c.customer_id = u.id
-        LEFT JOIN users approver ON c.approved_by = approver.id
-        WHERE 1=1
-      `;
+            selectFields += `,
+      approver.full_name as approver_name`;
         }
+        if (hasCreatedByColumn) {
+            selectFields += `,
+      creator.full_name as creator_name`;
+        }
+        // Build count query
+        let countQuery = `
+      SELECT COUNT(*) as total
+      FROM contracts c
+      LEFT JOIN users u ON c.customer_id = u.id
+    `;
+        if (hasApprovedByColumn) {
+            countQuery += ` LEFT JOIN users approver ON c.approved_by = approver.id`;
+        }
+        if (hasCreatedByColumn) {
+            countQuery += ` LEFT JOIN users creator ON c.created_by = creator.id`;
+        }
+        countQuery += ` WHERE 1=1`;
+        // Build data query
+        let query = `
+      SELECT ${selectFields}
+      FROM contracts c
+      LEFT JOIN users u ON c.customer_id = u.id
+    `;
+        if (hasApprovedByColumn) {
+            query += ` LEFT JOIN users approver ON c.approved_by = approver.id`;
+        }
+        if (hasCreatedByColumn) {
+            query += ` LEFT JOIN users creator ON c.created_by = creator.id`;
+        }
+        query += ` WHERE 1=1`;
         const params = [];
         let paramCount = 1;
         // Apply role-based filtering - IDOR protection
         if (req.user.role === 'user') {
-            query += ` AND c.customer_id = $${paramCount++}`;
+            query += ` AND c.customer_id = $${paramCount}`;
+            countQuery += ` AND c.customer_id = $${paramCount}`;
             params.push(req.user.id);
+            paramCount++;
+        }
+        else if (req.user.role === 'staff') {
+            const clauses = [];
+            clauses.push(`c.status IN ('pending', 'pending_approval')`);
+            clauses.push(`c.approved_by = $${paramCount}`);
+            params.push(req.user.id);
+            paramCount++;
+            query += ` AND (${clauses.join(' OR ')})`;
+            countQuery += ` AND (${clauses.join(' OR ')})`;
         }
         else if (customer_id) {
             // Validate customer_id format for admin/manager/staff
             if (!(0, validation_1.isValidUUID)(customer_id)) {
                 return res.status(400).json({ error: 'Invalid customer ID format' });
             }
-            query += ` AND c.customer_id = $${paramCount++}`;
+            query += ` AND c.customer_id = $${paramCount}`;
+            countQuery += ` AND c.customer_id = $${paramCount}`;
             params.push(customer_id);
+            paramCount++;
         }
         if (status) {
             // Validate status
             if (!(0, validation_1.isValidContractStatus)(status)) {
                 return res.status(400).json({ error: 'Invalid contract status' });
             }
-            query += ` AND c.status = $${paramCount++}`;
+            query += ` AND c.status = $${paramCount}`;
+            countQuery += ` AND c.status = $${paramCount}`;
             params.push(status);
+            paramCount++;
+        }
+        // Date range filtering
+        if (start_date && (0, validation_1.isValidDate)(start_date)) {
+            query += ` AND c.start_date >= $${paramCount}`;
+            countQuery += ` AND c.start_date >= $${paramCount}`;
+            params.push(start_date);
+            paramCount++;
+        }
+        if (end_date && (0, validation_1.isValidDate)(end_date)) {
+            query += ` AND c.end_date <= $${paramCount}`;
+            countQuery += ` AND c.end_date <= $${paramCount}`;
+            params.push(end_date);
+            paramCount++;
+        }
+        // Rebate percentage range filtering
+        if (min_rebate) {
+            const minRebate = (0, validation_1.sanitizeNumber)(min_rebate, 0, 100);
+            if (minRebate !== null) {
+                query += ` AND c.rebate_percentage >= $${paramCount}`;
+                countQuery += ` AND c.rebate_percentage >= $${paramCount}`;
+                params.push(minRebate);
+                paramCount++;
+            }
+        }
+        if (max_rebate) {
+            const maxRebate = (0, validation_1.sanitizeNumber)(max_rebate, 0, 100);
+            if (maxRebate !== null) {
+                query += ` AND c.rebate_percentage <= $${paramCount}`;
+                countQuery += ` AND c.rebate_percentage <= $${paramCount}`;
+                params.push(maxRebate);
+                paramCount++;
+            }
         }
         // Safe sort by (whitelisted)
         if (sortBy.startsWith('-')) {
@@ -451,8 +583,23 @@ const filterContracts = async (req, res) => {
         else {
             query += ` ORDER BY c.${sortBy} ASC`;
         }
+        // Add pagination
+        query += ` LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+        params.push(limit, offset);
+        // Get total count
+        const countResult = await connection_1.default.query(countQuery, params.slice(0, paramCount - 1));
+        const total = parseInt(countResult.rows[0].total, 10);
+        // Get paginated results
         const result = await connection_1.default.query(query, params);
-        res.json(result.rows);
+        res.json({
+            data: result.rows,
+            pagination: {
+                page,
+                pageSize: limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
     }
     catch (error) {
         console.error('Filter contracts error:', error);

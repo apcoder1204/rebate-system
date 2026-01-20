@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -6,36 +39,77 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.passwordResetRateLimit = exports.apiRateLimit = exports.authRateLimit = exports.securityHeaders = void 0;
 exports.isValidUrl = isValidUrl;
 exports.sanitizeFilePath = sanitizeFilePath;
-const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
+const express_rate_limit_1 = __importStar(require("express-rate-limit"));
 const helmet_1 = __importDefault(require("helmet"));
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 /**
  * Security headers middleware
  */
 exports.securityHeaders = (0, helmet_1.default)({
-    contentSecurityPolicy: false, // Disable CSP for API - it's handled by CORS
-    crossOriginEmbedderPolicy: false, // Allow file uploads and cross-origin requests
-    crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow cross-origin resource sharing
-    crossOriginOpenerPolicy: { policy: "unsafe-none" }, // Allow cross-origin requests for API
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'"],
+            imgSrc: ["'self'", "data:", "https:"],
+        },
+    },
+    crossOriginEmbedderPolicy: false, // Allow file uploads
 });
 /**
  * Rate limiting for authentication endpoints
  */
 exports.authRateLimit = (0, express_rate_limit_1.default)({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // Limit each IP to 5 requests per windowMs
+    // Allow more room overall, but only count failed attempts
+    max: process.env.NODE_ENV === 'production' ? 50 : 200,
     message: 'Too many authentication attempts, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
+    // Only count failed logins (4xx/5xx). Successful logins are skipped.
+    skipSuccessfulRequests: true,
+    keyGenerator: (req) => {
+        const email = typeof req.body?.email === 'string' ? req.body.email.toLowerCase() : '';
+        // Use ipKeyGenerator helper for IPv6 compatibility
+        const ip = (0, express_rate_limit_1.ipKeyGenerator)(req);
+        return `${ip}:${email}`;
+    },
+    skip: (req) => {
+        // Skip rate limiting for localhost in development
+        return process.env.NODE_ENV !== 'production' && req.ip === '::1';
+    },
 });
 /**
  * Rate limiting for general API endpoints
+ * Uses user ID from JWT token for per-user rate limiting instead of IP-based
  */
 exports.apiRateLimit = (0, express_rate_limit_1.default)({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
-    message: 'Too many requests from this IP, please try again later.',
+    windowMs: 150 * 60 * 1000, // 150 minutes
+    max: 500, // Limit each user to 500 requests per windowMs
+    message: 'Too many requests, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
+    keyGenerator: (req) => {
+        // Use user ID from token if authenticated, otherwise fall back to IP
+        const token = req.headers.authorization?.split(' ')[1];
+        if (token) {
+            try {
+                const jwtSecret = process.env.JWT_SECRET;
+                if (jwtSecret && jwtSecret !== 'your-secret-key') {
+                    const decoded = jsonwebtoken_1.default.verify(token, jwtSecret);
+                    if (decoded?.id) {
+                        return decoded.id; // Per-user rate limiting
+                    }
+                }
+            }
+            catch {
+                // Invalid token, fall back to IP
+            }
+        }
+        // Use ipKeyGenerator helper for IPv6 compatibility
+        return (0, express_rate_limit_1.ipKeyGenerator)(req); // Fall back to IP for unauthenticated requests
+    },
+    skipSuccessfulRequests: false, // Count all requests
 });
 /**
  * Rate limiting for password reset

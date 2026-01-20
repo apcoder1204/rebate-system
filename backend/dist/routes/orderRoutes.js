@@ -38,10 +38,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const orderController = __importStar(require("../controllers/orderController"));
+const exportController_1 = require("../controllers/exportController");
 const auth_1 = require("../middleware/auth");
 const router = express_1.default.Router();
 router.get('/', auth_1.authenticate, orderController.listOrders);
 router.get('/filter', auth_1.authenticate, orderController.filterOrders);
+router.get('/export/csv', auth_1.authenticate, exportController_1.exportOrdersCSV);
 router.get('/:id', auth_1.authenticate, orderController.getOrder);
 router.post('/', auth_1.authenticate, orderController.createOrder);
 router.put('/:id', auth_1.authenticate, orderController.updateOrder);

@@ -5,7 +5,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authorize = exports.authenticate = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const authenticate = (req, res, next) => {
+const connection_1 = __importDefault(require("../db/connection"));
+const authenticate = async (req, res, next) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
         if (!token) {
@@ -21,6 +22,24 @@ const authenticate = (req, res, next) => {
         // Validate decoded token structure
         if (!decoded.id || !decoded.email || !decoded.role) {
             return res.status(401).json({ error: 'Invalid token structure' });
+        }
+        // Check if user is active - DB check for security
+        // We cache this check for 1 minute to avoid hammering DB on every request if needed
+        // But for now, direct check for immediate deactivation effect
+        try {
+            const userResult = await connection_1.default.query('SELECT is_active FROM users WHERE id = $1', [decoded.id]);
+            if (userResult.rows.length === 0) {
+                return res.status(401).json({ error: 'User not found' });
+            }
+            if (userResult.rows[0].is_active === false) {
+                return res.status(403).json({ error: 'Account is inactive. Please contact support.' });
+            }
+        }
+        catch (dbError) {
+            console.error('Auth DB check failed:', dbError);
+            // Proceed cautiously or fail secure? 
+            // Failing secure for authentication critical path
+            return res.status(500).json({ error: 'Authentication check failed' });
         }
         req.user = {
             id: decoded.id,

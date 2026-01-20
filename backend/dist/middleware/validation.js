@@ -11,6 +11,7 @@ exports.isValidRole = isValidRole;
 exports.isValidOrderStatus = isValidOrderStatus;
 exports.isValidContractStatus = isValidContractStatus;
 exports.sanitizeSortBy = sanitizeSortBy;
+exports.sanitizePagination = sanitizePagination;
 const express_validator_1 = require("express-validator");
 /**
  * Validation middleware to check validation results
@@ -93,7 +94,7 @@ function isValidRole(role) {
  * Validate order status
  */
 function isValidOrderStatus(status) {
-    return ['pending', 'confirmed', 'cancelled'].includes(status);
+    return ['pending', 'confirmed', 'disputed', 'cancelled'].includes(status);
 }
 /**
  * Validate contract status
@@ -116,4 +117,21 @@ function sanitizeSortBy(sortBy, allowedFields, defaultSort = '') {
         return isDescending ? `-${field}` : field;
     }
     return defaultSort;
+}
+/**
+ * Sanitize and validate pagination parameters
+ */
+function sanitizePagination(page, pageSize) {
+    const DEFAULT_PAGE_SIZE = 20;
+    const MAX_PAGE_SIZE = 100;
+    const MIN_PAGE_SIZE = 5;
+    const pageNum = typeof page === 'string' ? parseInt(page, 10) : (page || 1);
+    const size = typeof pageSize === 'string' ? parseInt(pageSize, 10) : (pageSize || DEFAULT_PAGE_SIZE);
+    const sanitizedPage = Math.max(1, isNaN(pageNum) ? 1 : pageNum);
+    const sanitizedSize = Math.max(MIN_PAGE_SIZE, Math.min(MAX_PAGE_SIZE, isNaN(size) ? DEFAULT_PAGE_SIZE : size));
+    return {
+        page: sanitizedPage,
+        limit: sanitizedSize,
+        offset: (sanitizedPage - 1) * sanitizedSize
+    };
 }

@@ -58,16 +58,36 @@ const login = async (req, res) => {
         if (typeof password !== 'string' || password.length > 128) {
             return res.status(400).json({ error: 'Invalid password format' });
         }
-        const result = await connection_1.default.query('SELECT id, email, password_hash, full_name, role, phone, created_date FROM users WHERE email = $1', [sanitizedEmail]);
+        const result = await connection_1.default.query('SELECT id, email, password_hash, full_name, role, phone, created_date, is_active FROM users WHERE email = $1', [sanitizedEmail]);
         if (result.rows.length === 0) {
+            if (process.env.NODE_ENV !== 'production') {
+                console.log(`Login attempt failed: User not found for email: ${sanitizedEmail}`);
+            }
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         const user = result.rows[0];
+        // Check if account is active
+        if (user.is_active === false) {
+            if (process.env.NODE_ENV !== 'production') {
+                console.log(`Login attempt failed: Inactive account for email: ${sanitizedEmail}`);
+            }
+            return res.status(403).json({ error: 'Account is inactive. Please contact support.' });
+        }
         const isValidPassword = await bcryptjs_1.default.compare(password, user.password_hash);
         if (!isValidPassword) {
+            if (process.env.NODE_ENV !== 'production') {
+                console.log(`Login attempt failed: Invalid password for email: ${sanitizedEmail}`);
+            }
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         const token = jsonwebtoken_1.default.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET || 'your-secret-key', { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') });
+        // Log only success without sensitive details in production
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`Login successful for user: ${user.email} (${user.role})`);
+        }
+        else {
+            console.log(`Login successful for user ID: ${user.id}`);
+        }
         res.json({
             user: {
                 id: user.id,
@@ -82,6 +102,11 @@ const login = async (req, res) => {
     }
     catch (error) {
         console.error('Login error:', error);
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            email: req.body?.email,
+        });
         res.status(500).json({ error: 'Internal server error' });
     }
 };
@@ -152,9 +177,9 @@ const register = async (req, res) => {
             }
         }
         // Always create user with 'user' role initially
-        const result = await connection_1.default.query(`INSERT INTO users (email, password_hash, full_name, phone, role, phone_verified, email_verified) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7) 
-       RETURNING id, email, full_name, role, phone, created_date`, [sanitizedEmail, hashedPassword, sanitizedFullName, formattedPhone, 'user', true, true]);
+        const result = await connection_1.default.query(`INSERT INTO users (email, password_hash, full_name, phone, role, phone_verified, email_verified, is_active) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+       RETURNING id, email, full_name, role, phone, created_date, is_active`, [sanitizedEmail, hashedPassword, sanitizedFullName, formattedPhone, 'user', true, true, true]);
         const user = result.rows[0];
         // If user requested a higher role, create a role request
         if (requested_role && requested_role !== 'user') {
@@ -282,8 +307,55 @@ const changePassword = async (req, res) => {
 exports.changePassword = changePassword;
 const listUsers = async (req, res) => {
     try {
-        const result = await connection_1.default.query('SELECT id, email, full_name, role, phone, created_date FROM users ORDER BY created_date DESC');
-        res.json(result.rows);
+        const { role, is_active, search } = req.query;
+        const { page, limit, offset } = (0, validation_1.sanitizePagination)(req.query.page, req.query.pageSize);
+        // Build count query
+        let countQuery = 'SELECT COUNT(*) as total FROM users WHERE 1=1';
+        let query = 'SELECT id, email, full_name, role, phone, created_date, is_active FROM users WHERE 1=1';
+        const params = [];
+        let paramCount = 1;
+        // Role filtering
+        if (role && typeof role === 'string' && (0, validation_1.isValidRole)(role)) {
+            query += ` AND role = $${paramCount}`;
+            countQuery += ` AND role = $${paramCount}`;
+            params.push(role);
+            paramCount++;
+        }
+        // Active status filtering
+        if (is_active !== undefined) {
+            const isActiveValue = typeof is_active === 'string' ? is_active : String(is_active);
+            const isActive = isActiveValue === 'true' || isActiveValue === '1';
+            query += ` AND is_active = $${paramCount}`;
+            countQuery += ` AND is_active = $${paramCount}`;
+            params.push(isActive);
+            paramCount++;
+        }
+        // Search filtering (name or email)
+        if (search && typeof search === 'string' && search.trim()) {
+            const searchTerm = `%${search.trim()}%`;
+            query += ` AND (full_name ILIKE $${paramCount} OR email ILIKE $${paramCount})`;
+            countQuery += ` AND (full_name ILIKE $${paramCount} OR email ILIKE $${paramCount})`;
+            params.push(searchTerm);
+            paramCount++;
+        }
+        query += ' ORDER BY created_date DESC';
+        // Add pagination
+        query += ` LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+        params.push(limit, offset);
+        // Get total count
+        const countResult = await connection_1.default.query(countQuery, params.slice(0, paramCount - 1));
+        const total = parseInt(countResult.rows[0].total, 10);
+        // Get paginated results
+        const result = await connection_1.default.query(query, params);
+        res.json({
+            data: result.rows,
+            pagination: {
+                page,
+                pageSize: limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
     }
     catch (error) {
         console.error('List users error:', error);

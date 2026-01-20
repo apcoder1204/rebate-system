@@ -42,8 +42,8 @@ export const User = {
     if (filters?.role) params.append('role', filters.role);
     if (filters?.is_active !== undefined) params.append('is_active', String(filters.is_active));
     if (filters?.search) params.append('search', filters.search);
-    if (page) params.append('page', String(page));
-    if (pageSize) params.append('pageSize', String(pageSize));
+    if (page !== undefined) params.append('page', String(page));
+    if (pageSize !== undefined) params.append('pageSize', String(pageSize));
     
     const query = params.toString();
     const response = await apiRequest(`/users/list${query ? `?${query}` : ''}`);
@@ -53,7 +53,20 @@ export const User = {
       throw new Error('No response received from server');
     }
     
-    // Ensure response has the expected structure
+    // Ensure response has the expected structure - handle both array and object responses
+    if (Array.isArray(response)) {
+      // If backend returns array directly, wrap it
+      return {
+        data: response,
+        pagination: {
+          page: page || 1,
+          pageSize: pageSize || 20,
+          total: response.length,
+          totalPages: 1
+        }
+      };
+    }
+    
     if (!response.data || !Array.isArray(response.data)) {
       console.error('Invalid response structure:', response);
       return {
