@@ -14,6 +14,7 @@ import OrderTrendsChart from '@/Components/reports/OrderTrendsChart';
 
 export default function Reports() {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [revenueData, setRevenueData] = useState<any>(null);
   const [orderTrendsData, setOrderTrendsData] = useState<any>(null);
@@ -47,6 +48,7 @@ export default function Reports() {
   const loadReports = async () => {
     try {
       setLoading(true);
+      setError(null);
       const [revenue, trends, summary] = await Promise.all([
         Admin.getRevenueReport(startDate, endDate),
         Admin.getOrderTrends(startDate, endDate, groupBy),
@@ -56,8 +58,12 @@ export default function Reports() {
       setRevenueData(revenue);
       setOrderTrendsData(trends);
       setSummaryStats(summary);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading reports:', error);
+      setError(error.message || 'Failed to load reports');
+      setRevenueData(null);
+      setOrderTrendsData(null);
+      setSummaryStats(null);
     } finally {
       setLoading(false);
     }
@@ -115,6 +121,17 @@ export default function Reports() {
             </p>
           </div>
         </div>
+
+        {error && (
+          <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-900/20">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <div className="text-red-600 dark:text-red-400 font-semibold">Error:</div>
+                <p className="text-red-700 dark:text-red-300">{error}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Date Range Filters */}
         <Card>

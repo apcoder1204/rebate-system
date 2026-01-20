@@ -106,8 +106,8 @@ export const Order = {
   async list(sortBy?: string, page?: number, pageSize?: number): Promise<PaginatedResponse<OrderType>> {
     const params = new URLSearchParams();
     if (sortBy) params.append('sortBy', sortBy);
-    if (page) params.append('page', String(page));
-    if (pageSize) params.append('pageSize', String(pageSize));
+    if (page !== undefined) params.append('page', String(page));
+    if (pageSize !== undefined) params.append('pageSize', String(pageSize));
     const query = params.toString();
     const response = await apiRequest(`/orders${query ? `?${query}` : ''}`);
     return normalizeOrderResponse(response, page, pageSize);
@@ -121,8 +121,8 @@ export const Order = {
     if (filters.min_amount !== undefined) params.append('min_amount', String(filters.min_amount));
     if (filters.max_amount !== undefined) params.append('max_amount', String(filters.max_amount));
     if (sortBy) params.append('sortBy', sortBy);
-    if (page) params.append('page', String(page));
-    if (pageSize) params.append('pageSize', String(pageSize));
+    if (page !== undefined) params.append('page', String(page));
+    if (pageSize !== undefined) params.append('pageSize', String(pageSize));
     const response = await apiRequest(`/orders/filter?${params.toString()}`);
     return normalizeOrderResponse(response, page, pageSize);
   },

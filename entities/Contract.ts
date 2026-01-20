@@ -91,8 +91,8 @@ export const Contract = {
     const params = new URLSearchParams();
     if (sortBy) params.append('sortBy', sortBy);
     if (options?.includeAll) params.append('include_all', 'true');
-    if (page) params.append('page', String(page));
-    if (pageSize) params.append('pageSize', String(pageSize));
+    if (page !== undefined) params.append('page', String(page));
+    if (pageSize !== undefined) params.append('pageSize', String(pageSize));
     const query = params.toString() ? `?${params.toString()}` : '';
     const response = await apiRequest(`/contracts${query}`);
     return normalizeContractResponse(response, page, pageSize);
@@ -112,8 +112,8 @@ export const Contract = {
     if (filters.min_rebate !== undefined) params.append('min_rebate', String(filters.min_rebate));
     if (filters.max_rebate !== undefined) params.append('max_rebate', String(filters.max_rebate));
     if (sortBy) params.append('sortBy', sortBy);
-    if (page) params.append('page', String(page));
-    if (pageSize) params.append('pageSize', String(pageSize));
+    if (page !== undefined) params.append('page', String(page));
+    if (pageSize !== undefined) params.append('pageSize', String(pageSize));
     
     const response = await apiRequest(`/contracts/filter?${params.toString()}`);
     return normalizeContractResponse(response, page, pageSize);
