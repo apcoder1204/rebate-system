@@ -18,6 +18,7 @@ export default function ManageContracts() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingContract, setEditingContract] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -27,6 +28,7 @@ export default function ManageContracts() {
 
   const loadContracts = useCallback(async (currentPage?: number, currentPageSize?: number) => {
     try {
+      setError(null);
       const response = await Contract.list('-created_date', undefined, currentPage || page, currentPageSize || pageSize);
       setContracts(response.data);
       setTotal(response.pagination.total);
@@ -34,12 +36,16 @@ export default function ManageContracts() {
       setPage(response.pagination.page);
       setPageSize(response.pagination.pageSize);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load contracts';
+      setError(errorMessage);
       console.error("Error loading contracts:", error);
     }
   }, [page, pageSize]);
 
   const loadData = useCallback(async () => {
     try {
+      setError(null);
+      setLoading(true);
       const user = await User.me();
       const userRole = user.role || 'user';
       if (!['admin', 'manager', 'staff'].includes(userRole)) {
@@ -53,10 +59,13 @@ export default function ManageContracts() {
       setCustomers(customerUsers);
       await loadContracts(page, pageSize);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load data';
+      setError(errorMessage);
       console.error("Error loading data:", error);
       navigate(createPageUrl('Home'));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [navigate, page, pageSize, loadContracts]);
 
   useEffect(() => {
@@ -78,6 +87,19 @@ export default function ManageContracts() {
   return (
     <div className="min-h-screen p-6 md:p-8 bg-slate-50 dark:bg-slate-900">
       <div className="max-w-7xl mx-auto space-y-8">
+        {error && (
+          <Card className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+            <div className="p-4">
+              <p className="text-red-800 dark:text-red-200">{error}</p>
+              <button
+                onClick={() => loadData()}
+                className="mt-2 text-sm text-red-700 dark:text-red-300 underline hover:no-underline"
+              >
+                Try Again
+              </button>
+            </div>
+          </Card>
+        )}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-100 mb-2">Manage Contracts</h1>

@@ -14,6 +14,7 @@ import OrderTrendsChart from '@/Components/reports/OrderTrendsChart';
 
 export default function Reports() {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [revenueData, setRevenueData] = useState<any>(null);
   const [orderTrendsData, setOrderTrendsData] = useState<any>(null);
@@ -37,6 +38,7 @@ export default function Reports() {
         await loadReports();
       } catch (error) {
         console.error('Error loading user:', error);
+        setError('Failed to load reports. Please try again.');
         navigate(createPageUrl('Home'));
       }
     };
@@ -47,6 +49,7 @@ export default function Reports() {
   const loadReports = async () => {
     try {
       setLoading(true);
+      setError(null);
       const [revenue, trends, summary] = await Promise.all([
         Admin.getRevenueReport(startDate, endDate),
         Admin.getOrderTrends(startDate, endDate, groupBy),
@@ -58,6 +61,7 @@ export default function Reports() {
       setSummaryStats(summary || {});
     } catch (error) {
       console.error('Error loading reports:', error);
+      setError(`Failed to load reports: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -98,6 +102,24 @@ export default function Reports() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-900">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen p-6 md:p-8 bg-slate-50 dark:bg-slate-900">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+            <p className="text-red-800 dark:text-red-200">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -251,13 +273,25 @@ export default function Reports() {
         )}
 
         {/* Revenue Charts */}
-        {revenueData && (
+        {revenueData && revenueData.data && revenueData.data.length > 0 ? (
           <RevenueChart data={revenueData.data} totals={revenueData.totals} />
+        ) : (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <p className="text-slate-600 dark:text-slate-400">No revenue data available for the selected period</p>
+            </CardContent>
+          </Card>
         )}
 
         {/* Order Trends Charts */}
-        {orderTrendsData && (
-          <OrderTrendsChart data={orderTrendsData.data} groupBy={orderTrendsData.groupBy} />
+        {orderTrendsData && orderTrendsData.data && orderTrendsData.data.length > 0 ? (
+          <OrderTrendsChart data={orderTrendsData.data} groupBy={orderTrendsData.groupBy || 'day'} />
+        ) : (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <p className="text-slate-600 dark:text-slate-400">No order trend data available for the selected period</p>
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>

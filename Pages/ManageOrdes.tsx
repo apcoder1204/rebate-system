@@ -9,6 +9,7 @@ import { Plus, Filter, AlertCircle, Lock, Download } from "lucide-react";
 import { createPageUrl } from "@/utils";
 import { useNavigate } from "react-router-dom";
 import { Pagination } from "@/Components/ui/pagination";
+import { Card, CardContent } from "@/Components/ui/card";
 
 import OrdersList from "@/Components/staff/OrdersList";
 import CreateOrderDialog from "@/Components/staff/CreateOrderDialog";
@@ -27,6 +28,7 @@ export default function ManageOrders() {
   const [filterCustomerId, setFilterCustomerId] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
@@ -34,28 +36,37 @@ export default function ManageOrders() {
   const navigate = useNavigate();
 
   const loadOrders = useCallback(async (customerId?: string, status?: string, currentPage?: number, currentPageSize?: number) => {
-    const filters: OrderFilters = {};
-    if (customerId && customerId !== 'all') filters.customer_id = customerId;
-    if (status && status !== 'all') filters.customer_status = status;
+    try {
+      setError(null);
+      const filters: OrderFilters = {};
+      if (customerId && customerId !== 'all') filters.customer_id = customerId;
+      if (status && status !== 'all') filters.customer_status = status;
 
-    const response = await Order.filter(filters, '-order_date', currentPage || page, currentPageSize || pageSize);
-    const data = Array.isArray(response?.data) ? response.data : [];
-    const pagination = response?.pagination || {
-      page: currentPage || page,
-      pageSize: currentPageSize || pageSize,
-      total: data.length,
-      totalPages: data.length === 0 ? 0 : 1,
-    };
+      const response = await Order.filter(filters, '-order_date', currentPage || page, currentPageSize || pageSize);
+      const data = Array.isArray(response?.data) ? response.data : [];
+      const pagination = response?.pagination || {
+        page: currentPage || page,
+        pageSize: currentPageSize || pageSize,
+        total: data.length,
+        totalPages: data.length === 0 ? 0 : 1,
+      };
 
-    setOrders(data as never[]);
-    setTotal(pagination.total);
-    setTotalPages(pagination.totalPages);
-    setPage(pagination.page);
-    setPageSize(pagination.pageSize);
+      setOrders(data as never[]);
+      setTotal(pagination.total);
+      setTotalPages(pagination.totalPages);
+      setPage(pagination.page);
+      setPageSize(pagination.pageSize);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load orders';
+      setError(errorMessage);
+      console.error('Error loading orders:', err);
+    }
   }, [page, pageSize]);
 
   const loadData = useCallback(async () => {
     try {
+      setError(null);
+      setLoading(true);
       const user = await User.me();
       const userRole = user.role || 'user';
       
@@ -76,10 +87,13 @@ export default function ManageOrders() {
 
       await loadOrders(filterCustomerId, filterStatus);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load data';
+      setError(errorMessage);
       console.error("Error loading data:", error);
       navigate(createPageUrl('Home'));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [filterCustomerId, filterStatus, loadOrders, navigate]);
 
   useEffect(() => {
@@ -128,6 +142,19 @@ export default function ManageOrders() {
   return (
     <div className="min-h-screen p-6 md:p-8 bg-slate-50 dark:bg-slate-900">
       <div className="max-w-7xl mx-auto space-y-8">
+        {error && (
+          <Card className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+            <CardContent className="p-4">
+              <p className="text-red-800 dark:text-red-200">{error}</p>
+              <button
+                onClick={() => loadData()}
+                className="mt-2 text-sm text-red-700 dark:text-red-300 underline hover:no-underline"
+              >
+                Try Again
+              </button>
+            </CardContent>
+          </Card>
+        )}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-100 mb-2">Manage Orders</h1>
