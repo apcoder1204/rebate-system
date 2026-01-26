@@ -14,7 +14,6 @@ import { Card, CardContent } from "@/Components/ui/card";
 import OrdersList from "@/Components/staff/OrdersList";
 import CreateOrderDialog from "@/Components/staff/CreateOrderDialog";
 import ViewOrderDialog from "@/Components/staff/ViewOrderDialog";
-import { Card, CardContent } from "@/Components/ui/card";
 
 export default function ManageOrders() {
   const [orders, setOrders] = useState([]);
