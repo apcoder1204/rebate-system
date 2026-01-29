@@ -39,17 +39,105 @@ export default function Dashboard() {
       setUser(currentUser);
 
       if (currentUser.role === 'admin') {
-        const contractsResponse = await Contract.list('-created_date', undefined, 1, 100);
-        const ordersResponse = await Order.list('-order_date', 1, 100);
-        console.log("Admin data - contracts:", contractsResponse, "orders:", ordersResponse);
-        setContracts(ensureArray(contractsResponse?.data));
-        setOrders(ensureArray(ordersResponse?.data));
+        // Load all contracts by fetching multiple pages if needed
+        const allContracts: any[] = [];
+        let contractPage = 1;
+        const contractPageSize = 100;
+        let hasMoreContracts = true;
+
+        while (hasMoreContracts) {
+          const contractsResponse = await Contract.list('-created_date', undefined, contractPage, contractPageSize);
+          const contractsData = ensureArray(contractsResponse?.data);
+          allContracts.push(...contractsData);
+          
+          const totalContracts = contractsResponse?.pagination?.total || 0;
+          const totalContractPages = contractsResponse?.pagination?.totalPages || 1;
+          
+          if (contractPage >= totalContractPages || contractsData.length < contractPageSize) {
+            hasMoreContracts = false;
+          } else {
+            contractPage++;
+          }
+        }
+
+        console.log("Admin contracts - total loaded:", allContracts.length);
+        setContracts(allContracts);
+
+        // Load all orders by fetching multiple pages if needed
+        const allOrders: any[] = [];
+        let page = 1;
+        const pageSize = 100;
+        let hasMore = true;
+
+        while (hasMore) {
+          const ordersResponse = await Order.list('-order_date', page, pageSize);
+          const ordersData = ensureArray(ordersResponse?.data);
+          allOrders.push(...ordersData);
+          
+          const total = ordersResponse?.pagination?.total || 0;
+          const totalPages = ordersResponse?.pagination?.totalPages || 1;
+          
+          console.log(`Loaded page ${page}: ${ordersData.length} orders (total: ${total}, pages: ${totalPages})`);
+          
+          if (page >= totalPages || ordersData.length < pageSize) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        }
+
+        console.log("Admin orders - total loaded:", allOrders.length);
+        setOrders(allOrders);
       } else {
-        const userContractsResponse = await Contract.filter({ customer_id: currentUser.id }, undefined, 1, 100);
-        const userOrdersResponse = await Order.filter({ customer_id: currentUser.id }, '-order_date', 1, 100);
-        console.log("User data - contracts:", userContractsResponse, "orders:", userOrdersResponse);
-        setContracts(ensureArray(userContractsResponse?.data));
-        setOrders(ensureArray(userOrdersResponse?.data));
+        // Load all contracts by fetching multiple pages if needed
+        const allContracts: any[] = [];
+        let contractPage = 1;
+        const contractPageSize = 100;
+        let hasMoreContracts = true;
+
+        while (hasMoreContracts) {
+          const userContractsResponse = await Contract.filter({ customer_id: currentUser.id }, undefined, contractPage, contractPageSize);
+          const contractsData = ensureArray(userContractsResponse?.data);
+          allContracts.push(...contractsData);
+          
+          const totalContracts = userContractsResponse?.pagination?.total || 0;
+          const totalContractPages = userContractsResponse?.pagination?.totalPages || 1;
+          
+          if (contractPage >= totalContractPages || contractsData.length < contractPageSize) {
+            hasMoreContracts = false;
+          } else {
+            contractPage++;
+          }
+        }
+
+        console.log("User contracts - total loaded:", allContracts.length);
+        setContracts(allContracts);
+
+        // Load all orders by fetching multiple pages if needed
+        const allOrders: any[] = [];
+        let page = 1;
+        const pageSize = 100;
+        let hasMore = true;
+
+        while (hasMore) {
+          const userOrdersResponse = await Order.filter({ customer_id: currentUser.id }, '-order_date', page, pageSize);
+          const ordersData = ensureArray(userOrdersResponse?.data);
+          allOrders.push(...ordersData);
+          
+          const total = userOrdersResponse?.pagination?.total || 0;
+          const totalPages = userOrdersResponse?.pagination?.totalPages || 1;
+          
+          console.log(`Loaded page ${page}: ${ordersData.length} orders (total: ${total}, pages: ${totalPages})`);
+          
+          if (page >= totalPages || ordersData.length < pageSize) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        }
+
+        console.log("User orders - total loaded:", allOrders.length);
+        setOrders(allOrders);
       }
     } catch (error) {
       console.error("Error loading dashboard data:", error);
