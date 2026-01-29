@@ -9,5 +9,11 @@ export default defineConfig({
       "@": path.resolve(__dirname, "."),
     },
   },
+  build: {
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true,
+    },
+  },
 });
 
