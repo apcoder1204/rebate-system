@@ -552,13 +552,13 @@ export default function ManageUsers() {
                 </div>
               </CardContent>
             </Card>
-            {totalPages > 0 && (
+            {total > 0 && (
               <Card>
                 <Pagination
                   page={page}
                   pageSize={pageSize}
                   total={total}
-                  totalPages={totalPages}
+                  totalPages={totalPages > 0 ? totalPages : Math.max(1, Math.ceil(total / pageSize))}
                   onPageChange={(newPage) => {
                     setPage(newPage);
                     loadUsers(newPage, pageSize, searchQuery, roleFilter, activeFilter);

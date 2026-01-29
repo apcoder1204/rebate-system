@@ -56,9 +56,40 @@ export default function Reports() {
         Admin.getSummaryStats(startDate, endDate)
       ]);
       
-      setRevenueData(revenue || { data: [], totals: {} });
-      setOrderTrendsData(trends || { data: [] });
-      setSummaryStats(summary || {});
+      // Defensive checks for API responses
+      const safeRevenue = revenue && typeof revenue === 'object' 
+        ? { data: Array.isArray(revenue.data) ? revenue.data : [], totals: revenue.totals || {} }
+        : { data: [], totals: {} };
+      
+      const safeTrends = trends && typeof trends === 'object'
+        ? { data: Array.isArray(trends.data) ? trends.data : [], groupBy: trends.groupBy || groupBy }
+        : { data: [], groupBy };
+      
+      const safeSummary = summary && typeof summary === 'object'
+        ? {
+            totalOrders: summary.totalOrders || 0,
+            totalCustomers: summary.totalCustomers || 0,
+            pendingOrders: summary.pendingOrders || 0,
+            confirmedOrders: summary.confirmedOrders || 0,
+            disputedOrders: summary.disputedOrders || 0,
+            totalRevenue: summary.totalRevenue || 0,
+            totalRebate: summary.totalRebate || 0,
+            avgOrderValue: summary.avgOrderValue || 0,
+          }
+        : {
+            totalOrders: 0,
+            totalCustomers: 0,
+            pendingOrders: 0,
+            confirmedOrders: 0,
+            disputedOrders: 0,
+            totalRevenue: 0,
+            totalRebate: 0,
+            avgOrderValue: 0,
+          };
+
+      setRevenueData(safeRevenue);
+      setOrderTrendsData(safeTrends);
+      setSummaryStats(safeSummary);
     } catch (error) {
       console.error('Error loading reports:', error);
       setError(`Failed to load reports: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -222,7 +253,7 @@ export default function Reports() {
                   <div>
                     <p className="text-sm text-slate-600 dark:text-slate-400">Total Revenue</p>
                     <p className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                      Tsh {summaryStats.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      Tsh {((summaryStats?.totalRevenue || 0) as number).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   </div>
                 </div>
@@ -236,7 +267,7 @@ export default function Reports() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-600 dark:text-slate-400">Total Orders</p>
-                    <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{summaryStats.totalOrders}</p>
+                    <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{summaryStats?.totalOrders || 0}</p>
                   </div>
                 </div>
               </CardContent>
@@ -249,7 +280,7 @@ export default function Reports() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-600 dark:text-slate-400">Confirmed Orders</p>
-                    <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{summaryStats.confirmedOrders}</p>
+                    <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{summaryStats?.confirmedOrders || 0}</p>
                   </div>
                 </div>
               </CardContent>
@@ -263,7 +294,7 @@ export default function Reports() {
                   <div>
                     <p className="text-sm text-slate-600 dark:text-slate-400">Total Rebate</p>
                     <p className="text-xl font-bold text-green-600 dark:text-green-400">
-                      Tsh {summaryStats.totalRebate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      Tsh {((summaryStats?.totalRebate || 0) as number).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   </div>
                 </div>
@@ -284,8 +315,8 @@ export default function Reports() {
         )}
 
         {/* Order Trends Charts */}
-        {orderTrendsData && orderTrendsData.data && orderTrendsData.data.length > 0 ? (
-          <OrderTrendsChart data={orderTrendsData.data} groupBy={orderTrendsData.groupBy || 'day'} />
+        {orderTrendsData && Array.isArray(orderTrendsData.data) && orderTrendsData.data.length > 0 ? (
+          <OrderTrendsChart data={orderTrendsData.data} groupBy={orderTrendsData.groupBy || groupBy} />
         ) : (
           <Card>
             <CardContent className="p-8 text-center">

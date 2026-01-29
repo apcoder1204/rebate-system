@@ -47,14 +47,19 @@ export default function ManageOrders() {
         page: currentPage || page,
         pageSize: currentPageSize || pageSize,
         total: data.length,
-        totalPages: data.length === 0 ? 0 : 1,
+        totalPages: data.length === 0 ? 0 : Math.max(1, Math.ceil(data.length / (currentPageSize || pageSize))),
       };
 
+      // Ensure totalPages is at least 1 if there's data
+      const safeTotalPages = pagination.total > 0 && pagination.totalPages === 0 
+        ? Math.max(1, Math.ceil(pagination.total / pagination.pageSize))
+        : pagination.totalPages;
+
       setOrders(data as never[]);
-      setTotal(pagination.total);
-      setTotalPages(pagination.totalPages);
-      setPage(pagination.page);
-      setPageSize(pagination.pageSize);
+      setTotal(pagination.total || 0);
+      setTotalPages(safeTotalPages || 0);
+      setPage(pagination.page || (currentPage || page));
+      setPageSize(pagination.pageSize || (currentPageSize || pageSize));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load orders';
       setError(errorMessage);
@@ -314,13 +319,13 @@ export default function ManageOrders() {
           currentUserId={currentUserId || undefined}
         />
 
-        {totalPages > 0 && (
+        {total > 0 && (
           <Card>
             <Pagination
               page={page}
               pageSize={pageSize}
               total={total}
-              totalPages={totalPages}
+              totalPages={totalPages > 0 ? totalPages : Math.max(1, Math.ceil(total / pageSize))}
               onPageChange={(newPage) => {
                 setPage(newPage);
                 loadOrders(filterCustomerId, filterStatus, newPage, pageSize);
