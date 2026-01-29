@@ -155,7 +155,7 @@ export const triggerOrderReminders = async (req: AuthRequest, res: Response) => 
       req.user!.id,
       'trigger_order_reminders',
       'system',
-      null,
+      undefined,
       { emails_sent: result.emailsSent, errors: result.errors },
       req.ip
     );

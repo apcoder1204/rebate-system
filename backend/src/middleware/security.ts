@@ -30,10 +30,10 @@ export const authRateLimit = rateLimit({
   legacyHeaders: false,
   // Only count failed logins (4xx/5xx). Successful logins are skipped.
   skipSuccessfulRequests: true,
-  keyGenerator: (req) => {
+  keyGenerator: (req: Request) => {
     const email = typeof req.body?.email === 'string' ? req.body.email.toLowerCase() : '';
     // Use ipKeyGenerator helper for IPv6 compatibility
-    const ip = ipKeyGenerator(req);
+    const ip = ipKeyGenerator(req as any);
     return `${ip}:${email}`;
   },
   skip: (req) => {
@@ -69,7 +69,7 @@ export const apiRateLimit = rateLimit({
       }
     }
     // Use ipKeyGenerator helper for IPv6 compatibility
-    return ipKeyGenerator(req); // Fall back to IP for unauthenticated requests
+    return ipKeyGenerator(req as any); // Fall back to IP for unauthenticated requests
   },
   skipSuccessfulRequests: false, // Count all requests
 });

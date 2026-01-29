@@ -235,7 +235,7 @@ testConnections().then(() => {
 });
 
 // Global error handler for unhandled errors
-process.on('uncaughtException', (error) => {
+process.on('uncaughtException', (error: NodeJS.ErrnoException) => {
   // Check if it's a database connection error that we should handle gracefully
   if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || 
       error.syscall === 'read' || error.message?.includes('connection')) {

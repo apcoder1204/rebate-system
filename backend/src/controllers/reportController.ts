@@ -56,7 +56,7 @@ export const getRevenueReport = async (req: AuthRequest, res: Response) => {
 
     // Calculate totals
     const totals = result.rows.reduce(
-      (acc, row) => ({
+      (acc: any, row: any) => ({
         totalOrders: acc.totalOrders + parseInt(row.order_count, 10),
         totalCustomers: acc.totalCustomers + parseInt(row.customer_count, 10),
         totalRevenue: acc.totalRevenue + parseFloat(row.total_revenue || 0),
@@ -66,7 +66,7 @@ export const getRevenueReport = async (req: AuthRequest, res: Response) => {
     );
 
     res.json({
-      data: result.rows.map((row) => ({
+      data: result.rows.map((row: any) => ({
         date: row.date,
         orderCount: parseInt(row.order_count, 10),
         customerCount: parseInt(row.customer_count, 10),
@@ -158,7 +158,7 @@ export const getOrderTrends = async (req: AuthRequest, res: Response) => {
     const result = await pool.query(query, params);
 
     res.json({
-      data: result.rows.map((row) => ({
+      data: result.rows.map((row: any) => ({
         period: row.period,
         orderCount: parseInt(row.order_count, 10),
         uniqueCustomers: parseInt(row.unique_customers, 10),
@@ -239,7 +239,7 @@ export const getCustomerStats = async (req: AuthRequest, res: Response) => {
     const result = await pool.query(query, params);
 
     res.json({
-      data: result.rows.map((row) => ({
+      data: result.rows.map((row: any) => ({
         customerId: row.id,
         customerName: row.full_name,
         customerEmail: row.email,
