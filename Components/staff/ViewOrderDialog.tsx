@@ -21,6 +21,7 @@ interface ViewOrderDialogProps {
   isEditable: boolean;
   onSave: (orderId: string, orderData: any) => Promise<void>;
   customers: any[];
+  contracts?: any[];
 }
 
 export default function ViewOrderDialog({ 
@@ -29,7 +30,8 @@ export default function ViewOrderDialog({
   order, 
   isEditable, 
   onSave, 
-  customers 
+  customers,
+  contracts
 }: ViewOrderDialogProps) {
   const { showSuccess, showError } = useToast();
   const [formData, setFormData] = useState({
@@ -127,6 +129,19 @@ export default function ViewOrderDialog({
     return customer ? customer.email : "";
   };
 
+  const getContractLabel = () => {
+    if (!order) return "";
+    // Prefer contract_number if provided by backend
+    if (order.contract_number) return String(order.contract_number);
+    // If contracts list is available, resolve from contract_id
+    const contractId = order.contract_id || formData.contract_id;
+    if (contracts && contractId) {
+      const c = contracts.find((x: any) => x.id === contractId);
+      if (c?.contract_number) return String(c.contract_number);
+    }
+    return contractId ? String(contractId) : "";
+  };
+
   if (!order) return null;
 
   return (
@@ -148,6 +163,17 @@ export default function ViewOrderDialog({
               <div className="mt-1 p-3 bg-slate-50 rounded-md">
                 <div className="font-medium text-slate-900">{getCustomerName(order.customer_id)}</div>
                 <div className="text-sm text-slate-600">{getCustomerEmail(order.customer_id)}</div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Contract
+              </label>
+              <div className="mt-1 p-3 bg-slate-50 rounded-md">
+                <div className="font-medium text-slate-900">
+                  {getContractLabel() || "—"}
+                </div>
               </div>
             </div>
             

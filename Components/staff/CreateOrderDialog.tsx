@@ -73,11 +73,30 @@ export default function CreateOrderDialog({
 
   useEffect(() => {
     if (formData.customer_id) {
-      // Filter contracts by customer AND status (must be active or approved)
-      const customerContracts = contracts.filter((c: any) => 
-        c.customer_id === formData.customer_id && 
-        ['active', 'approved'].includes(c.status)
-      );
+      // Filter contracts by customer.
+      // For creating orders we allow any "usable" contract statuses.
+      // For editing an existing order, we also keep the currently selected contract
+      // even if its status is no longer usable (e.g., expired) so it doesn't render blank.
+      const allowedForNewOrder = new Set(['active', 'approved', 'pending', 'pending_approval']);
+      const excludedAlways = new Set(['rejected', 'cancelled']);
+
+      const customerContractsAll = contracts.filter((c: any) => c.customer_id === formData.customer_id);
+
+      const customerContracts = customerContractsAll.filter((c: any) => {
+        const status = String(c.status || '').toLowerCase();
+        if (excludedAlways.has(status)) return false;
+        if (editingOrder) return true; // editing: show all non-rejected/non-cancelled contracts
+        return allowedForNewOrder.has(status);
+      });
+
+      // Ensure currently selected contract is present in the list (edit/view scenarios)
+      if (formData.contract_id && !customerContracts.some((c: any) => c.id === formData.contract_id)) {
+        const selected = customerContractsAll.find((c: any) => c.id === formData.contract_id);
+        if (selected && !excludedAlways.has(String(selected.status || '').toLowerCase())) {
+          customerContracts.unshift(selected);
+        }
+      }
+
       setAvailableContracts(customerContracts);
       if (customerContracts.length > 0 && !formData.contract_id) {
         setFormData(prev => ({ ...prev, contract_id: customerContracts[0].id }));
@@ -85,7 +104,7 @@ export default function CreateOrderDialog({
     } else {
       setAvailableContracts([]);
     }
-  }, [formData.customer_id, contracts]);
+  }, [formData.customer_id, formData.contract_id, contracts, editingOrder]);
 
   const updateItem = (index: number, field: string, value: string) => {
     const newItems = [...items];
@@ -239,6 +258,11 @@ export default function CreateOrderDialog({
                 disabled={!formData.customer_id}
                 className="mt-1"
               />
+              {formData.customer_id && availableContracts.length === 0 && (
+                <p className="mt-2 text-sm text-amber-700">
+                  No contracts available for this customer. Please ensure the customer has a contract in an allowed status (e.g. active/approved/pending).
+                </p>
+              )}
             </div>
           </div>
 

@@ -47,19 +47,14 @@ export default function ManageOrders() {
         page: currentPage || page,
         pageSize: currentPageSize || pageSize,
         total: data.length,
-        totalPages: data.length === 0 ? 0 : Math.max(1, Math.ceil(data.length / (currentPageSize || pageSize))),
+        totalPages: data.length === 0 ? 0 : 1,
       };
 
-      // Ensure totalPages is at least 1 if there's data
-      const safeTotalPages = pagination.total > 0 && pagination.totalPages === 0 
-        ? Math.max(1, Math.ceil(pagination.total / pagination.pageSize))
-        : pagination.totalPages;
-
       setOrders(data as never[]);
-      setTotal(pagination.total || 0);
-      setTotalPages(safeTotalPages || 0);
-      setPage(pagination.page || (currentPage || page));
-      setPageSize(pagination.pageSize || (currentPageSize || pageSize));
+      setTotal(pagination.total);
+      setTotalPages(pagination.totalPages);
+      setPage(pagination.page);
+      setPageSize(pagination.pageSize);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load orders';
       setError(errorMessage);
@@ -81,10 +76,27 @@ export default function ManageOrders() {
       setCurrentUserRole(userRole);
       setCurrentUserId(user.id);
 
-      const contractsResponse = await Contract.list(undefined, { includeAll: true });
-      const allContracts = contractsResponse.data;
-      const allUsersResponse = await User.list();
-      const customerUsers = allUsersResponse.data.filter(u => !['admin', 'manager', 'staff'].includes(u.role || 'user')); 
+      // Fetch ALL contracts/users (backend is paginated: default 20, max 100)
+      const pageSize = 100;
+
+      const allContracts: any[] = [];
+      let contractsPage = 1;
+      while (true) {
+        const contractsResponse = await Contract.list(undefined, { includeAll: true }, contractsPage, pageSize);
+        allContracts.push(...(contractsResponse.data || []));
+        if (!contractsResponse.pagination || contractsPage >= contractsResponse.pagination.totalPages) break;
+        contractsPage++;
+      }
+
+      const allUsers: any[] = [];
+      let usersPage = 1;
+      while (true) {
+        const usersResponse = await User.list(undefined, usersPage, pageSize);
+        allUsers.push(...(usersResponse.data || []));
+        if (!usersResponse.pagination || usersPage >= usersResponse.pagination.totalPages) break;
+        usersPage++;
+      }
+      const customerUsers = allUsers.filter(u => !['admin', 'manager', 'staff'].includes(u.role || 'user')); 
       
       setContracts(allContracts as never[]);
       setCustomers(customerUsers as never[]);
@@ -319,13 +331,13 @@ export default function ManageOrders() {
           currentUserId={currentUserId || undefined}
         />
 
-        {total > 0 && (
+        {totalPages > 0 && (
           <Card>
             <Pagination
               page={page}
               pageSize={pageSize}
               total={total}
-              totalPages={totalPages > 0 ? totalPages : Math.max(1, Math.ceil(total / pageSize))}
+              totalPages={totalPages}
               onPageChange={(newPage) => {
                 setPage(newPage);
                 loadOrders(filterCustomerId, filterStatus, newPage, pageSize);
@@ -355,6 +367,7 @@ export default function ManageOrders() {
           isEditable={false}
           onSave={async () => {}}
           customers={customers}
+          contracts={contracts}
         />
       </div>
     </div>

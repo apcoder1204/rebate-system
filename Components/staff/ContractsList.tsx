@@ -84,8 +84,8 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
     // If we were viewing the same contract that was just approved, update it
     if (selectedContract && selectedContract.id === approvedContractId) {
       try {
-        const updatedContracts = await Contract.list('-created_date');
-        const updatedContract = updatedContracts.find((c: any) => c.id === approvedContractId);
+        const updatedContractsResponse = await Contract.list('-created_date');
+        const updatedContract = (updatedContractsResponse?.data || []).find((c: any) => c.id === approvedContractId);
         if (updatedContract) {
           setSelectedContract(updatedContract);
         }
@@ -98,8 +98,8 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
   const handleViewDetails = async (contract: any) => {
     // Fetch the latest contract data to ensure we have manager signature if it was just approved
     try {
-      const updatedContract = await Contract.list('-created_date');
-      const latestContract = updatedContract.find((c: any) => c.id === contract.id);
+      const updatedContractResponse = await Contract.list('-created_date');
+      const latestContract = (updatedContractResponse?.data || []).find((c: any) => c.id === contract.id);
       setSelectedContract(latestContract || contract);
     } catch (error) {
       console.error("Error fetching contract:", error);
