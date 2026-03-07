@@ -60,9 +60,7 @@ export default function MyOrders() {
       }
       setUser(currentUser);
       
-      console.log("Loading orders for customer:", currentUser.id);
       const userOrdersResponse = await Order.filter({ customer_id: currentUser.id }, '-order_date');
-      console.log("Orders loaded:", userOrdersResponse);
       
       const safeOrders = Array.isArray(userOrdersResponse?.data) ? userOrdersResponse.data : [];
       setOrders(safeOrders as never[]);

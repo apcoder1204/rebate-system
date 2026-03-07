@@ -45,18 +45,9 @@ export default function ContractPreviewDialog({
     phone: (contractData as any).customer_phone || (contractData as any).phone || '____________________'
   } : user;
   
-  // Debug: Log contract data to see what's available
+  // Contract data loaded
   React.useEffect(() => {
-    if (contractData && open) {
-      console.log('Contract Preview Data:', {
-        manager_signature_data_url: (contractData as any)?.manager_signature_data_url,
-        manager_name: (contractData as any)?.manager_name,
-        manager_position: (contractData as any)?.manager_position,
-        status: (contractData as any)?.status,
-        hasManagerSignature: !!(contractData as any)?.manager_signature_data_url,
-        fullContract: contractData
-      });
-    }
+    // Contract is ready to display
   }, [contractData, open]);
   
   // Default to PDF view for existing contracts with signed PDF

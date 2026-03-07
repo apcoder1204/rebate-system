@@ -28,8 +28,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       const currentUser = await (User as any).me();
       setUser(currentUser);
     } catch (error) {
-      console.log("User not authenticated");
-      // If not authenticated, redirect to login
+      // User not authenticated
       if (!location.pathname.includes('/login') && !location.pathname.includes('/register') && !location.pathname.includes('/forgot-password')) {
         await sessionLogout();
       }

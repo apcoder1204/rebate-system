@@ -63,11 +63,9 @@ export const login = async (req: Request, res: Response) => {
       { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as any }
     );
     
-    // Log only success without sensitive details in production
+    // Log only success without sensitive details
     if (process.env.NODE_ENV !== 'production') {
       console.log(`Login successful for user: ${user.email} (${user.role})`);
-    } else {
-      console.log(`Login successful for user ID: ${user.id}`);
     }
     
     res.json({

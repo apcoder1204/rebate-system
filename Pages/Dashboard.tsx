@@ -33,9 +33,7 @@ export default function Dashboard() {
 
   const loadData = useCallback(async () => {
     try {
-      console.log("Loading dashboard data...");
       const currentUser = await User.me();
-      console.log("Current user:", currentUser);
       setUser(currentUser);
 
       if (currentUser.role === 'admin') {
@@ -60,7 +58,6 @@ export default function Dashboard() {
           }
         }
 
-        console.log("Admin contracts - total loaded:", allContracts.length);
         setContracts(allContracts);
 
         // Load all orders by fetching multiple pages if needed
@@ -74,10 +71,7 @@ export default function Dashboard() {
           const ordersData = ensureArray(ordersResponse?.data);
           allOrders.push(...ordersData);
           
-          const total = ordersResponse?.pagination?.total || 0;
           const totalPages = ordersResponse?.pagination?.totalPages || 1;
-          
-          console.log(`Loaded page ${page}: ${ordersData.length} orders (total: ${total}, pages: ${totalPages})`);
           
           if (page >= totalPages || ordersData.length < pageSize) {
             hasMore = false;
@@ -86,7 +80,6 @@ export default function Dashboard() {
           }
         }
 
-        console.log("Admin orders - total loaded:", allOrders.length);
         setOrders(allOrders);
       } else {
         // Load all contracts by fetching multiple pages if needed
@@ -110,7 +103,6 @@ export default function Dashboard() {
           }
         }
 
-        console.log("User contracts - total loaded:", allContracts.length);
         setContracts(allContracts);
 
         // Load all orders by fetching multiple pages if needed
@@ -124,10 +116,7 @@ export default function Dashboard() {
           const ordersData = ensureArray(userOrdersResponse?.data);
           allOrders.push(...ordersData);
           
-          const total = userOrdersResponse?.pagination?.total || 0;
           const totalPages = userOrdersResponse?.pagination?.totalPages || 1;
-          
-          console.log(`Loaded page ${page}: ${ordersData.length} orders (total: ${total}, pages: ${totalPages})`);
           
           if (page >= totalPages || ordersData.length < pageSize) {
             hasMore = false;
@@ -136,7 +125,6 @@ export default function Dashboard() {
           }
         }
 
-        console.log("User orders - total loaded:", allOrders.length);
         setOrders(allOrders);
       }
     } catch (error) {
@@ -178,8 +166,6 @@ export default function Dashboard() {
   const stats = calculateStats();
   const userRole = user?.role || 'user';
   const isStaff = ['admin', 'manager', 'staff'].includes(userRole);
-  
-  console.log("Dashboard render - user:", user, "stats:", stats, "contracts:", contracts, "orders:", orders);
 
   // Create activities from orders and contracts
   const activities = [

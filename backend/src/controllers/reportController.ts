@@ -32,7 +32,7 @@ export const getRevenueReport = async (req: AuthRequest, res: Response) => {
         SUM(o.rebate_amount) as total_rebate,
         AVG(o.total_amount) as avg_order_value
       FROM orders o
-      WHERE o.customer_status = 'confirmed'
+      WHERE 1=1
     `;
 
     const params: any[] = [];
@@ -206,9 +206,9 @@ export const getCustomerStats = async (req: AuthRequest, res: Response) => {
         u.full_name,
         u.email,
         COUNT(o.id) as total_orders,
-        SUM(CASE WHEN o.customer_status = 'confirmed' THEN o.total_amount ELSE 0 END) as total_spent,
-        SUM(CASE WHEN o.customer_status = 'confirmed' THEN o.rebate_amount ELSE 0 END) as total_rebate,
-        AVG(CASE WHEN o.customer_status = 'confirmed' THEN o.total_amount ELSE NULL END) as avg_order_value,
+        SUM(o.total_amount) as total_spent,
+        SUM(o.rebate_amount) as total_rebate,
+        AVG(o.total_amount) as avg_order_value,
         MAX(o.order_date) as last_order_date
       FROM users u
       LEFT JOIN orders o ON u.id = o.customer_id
@@ -308,9 +308,9 @@ export const getSummaryStats = async (req: AuthRequest, res: Response) => {
         COUNT(CASE WHEN o.customer_status = 'pending' THEN 1 END) as pending_orders,
         COUNT(CASE WHEN o.customer_status = 'confirmed' THEN 1 END) as confirmed_orders,
         COUNT(CASE WHEN o.customer_status = 'disputed' THEN 1 END) as disputed_orders,
-        SUM(CASE WHEN o.customer_status = 'confirmed' THEN o.total_amount ELSE 0 END) as total_revenue,
-        SUM(CASE WHEN o.customer_status = 'confirmed' THEN o.rebate_amount ELSE 0 END) as total_rebate,
-        AVG(CASE WHEN o.customer_status = 'confirmed' THEN o.total_amount ELSE NULL END) as avg_order_value
+        SUM(o.total_amount) as total_revenue,
+        SUM(o.rebate_amount) as total_rebate,
+        AVG(o.total_amount) as avg_order_value
       FROM orders o
       ${dateFilter}
     `;

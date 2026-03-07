@@ -30,24 +30,11 @@ export default function ManageContracts() {
     try {
       setError(null);
       const response = await Contract.list('-created_date', undefined, currentPage || page, currentPageSize || pageSize);
-      const data = Array.isArray(response?.data) ? response.data : [];
-      const pagination = response?.pagination || {
-        page: currentPage || page,
-        pageSize: currentPageSize || pageSize,
-        total: data.length,
-        totalPages: data.length === 0 ? 0 : Math.max(1, Math.ceil(data.length / (currentPageSize || pageSize))),
-      };
-
-      // Ensure totalPages is at least 1 if there's data
-      const safeTotalPages = pagination.total > 0 && pagination.totalPages === 0 
-        ? Math.max(1, Math.ceil(pagination.total / pagination.pageSize))
-        : pagination.totalPages;
-
-      setContracts(data as never[]);
-      setTotal(pagination.total || 0);
-      setTotalPages(safeTotalPages || 0);
-      setPage(pagination.page || (currentPage || page));
-      setPageSize(pagination.pageSize || (currentPageSize || pageSize));
+      setContracts(response.data);
+      setTotal(response.pagination.total);
+      setTotalPages(response.pagination.totalPages);
+      setPage(response.pagination.page);
+      setPageSize(response.pagination.pageSize);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to load contracts';
       setError(errorMessage);
@@ -155,13 +142,13 @@ export default function ManageContracts() {
           }}
         />
 
-        {total > 0 && (
+        {totalPages > 0 && (
           <Card>
             <Pagination
               page={page}
               pageSize={pageSize}
               total={total}
-              totalPages={totalPages > 0 ? totalPages : Math.max(1, Math.ceil(total / pageSize))}
+              totalPages={totalPages}
               onPageChange={(newPage) => {
                 setPage(newPage);
                 loadContracts(newPage, pageSize);
