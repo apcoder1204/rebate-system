@@ -4,101 +4,119 @@ import { Order } from "@/entities/Order";
 import { createPageUrl } from "@/utils";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/Components/ui/card";
-import { Badge } from "@/Components/ui/badge";
-import { Input } from "@/Components/ui/input";
-import { 
-  ShoppingCart, 
+import { Button } from "@/Components/ui/button";
+import {
+  ShoppingCart,
   Search,
   Calendar,
   DollarSign,
-  Package
+  Package,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import { format, addMonths, isAfter } from "date-fns";
 
 import { OrderCard } from "@/Components/orders";
 import { OrderFilters } from "@/Components/orders";
 
+const PAGE_SIZE = 20;
+
 export default function MyOrders() {
-  const [user, setUser] = useState(null);
-  const [orders, setOrders] = useState([]);
-  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [user, setUser] = useState<any>(null);
+  const [orders, setOrders] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [grandTotalAmount, setGrandTotalAmount] = useState(0);
+  const [grandTotalRebate, setGrandTotalRebate] = useState(0);
+  const [unpaidEligibleRebate, setUnpaidEligibleRebate] = useState(0);
   const navigate = useNavigate();
 
-  const applyFilters = useCallback(() => {
-    let filtered = [...orders];
-
-    if (searchQuery) {
-      filtered = filtered.filter(order =>
-        order.order_number?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    if (filterStatus !== "all") {
-      filtered = filtered.filter(order => {
-        const eligibleDate = addMonths(new Date(order.order_date), 6);
-        const isEligible = isAfter(new Date(), eligibleDate);
-        
-        if (filterStatus === "eligible") return isEligible;
-        if (filterStatus === "pending") return !isEligible;
-        return true;
-      });
-    }
-
-    setFilteredOrders(filtered);
-  }, [orders, searchQuery, filterStatus]);
-  
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (page = 1) => {
     try {
       const currentUser = await User.me();
       if (['admin', 'manager', 'staff'].includes(currentUser.role)) {
-         // Staff should not see this customer-facing page
         navigate(createPageUrl('Dashboard'));
         return;
       }
       setUser(currentUser);
-      
-      const userOrdersResponse = await Order.filter({ customer_id: currentUser.id }, '-order_date');
-      
-      const safeOrders = Array.isArray(userOrdersResponse?.data) ? userOrdersResponse.data : [];
-      setOrders(safeOrders as never[]);
-    } catch (error) {
+
+      const response = await Order.filter(
+        { customer_id: currentUser.id },
+        '-order_date',
+        page,
+        PAGE_SIZE
+      );
+
+      const safeOrders = Array.isArray(response?.data) ? response.data : [];
+      setOrders(safeOrders);
+      setCurrentPage(response.pagination?.page ?? 1);
+      setTotalPages(response.pagination?.totalPages ?? 1);
+      setTotalCount(response.pagination?.total ?? safeOrders.length);
+
+      if (response.totals) {
+        setGrandTotalAmount(response.totals.totalAmount ?? 0);
+        setGrandTotalRebate(response.totals.totalRebate ?? 0);
+        setUnpaidEligibleRebate(response.totals.unpaidEligibleRebate ?? 0);
+      }
+    } catch (error: any) {
       console.error("Error loading orders:", error);
-      navigate(createPageUrl("Home"));
+      setLoadError(error?.message || "Failed to load orders. Please try again.");
     }
     setLoading(false);
   }, [navigate]);
 
   useEffect(() => {
-    loadData();
+    loadData(1);
   }, [loadData]);
 
-  useEffect(() => {
-    applyFilters();
-  }, [applyFilters]);
+  // Client-side filter on the current page only (search + status)
+  const filteredOrders = orders.filter((order) => {
+    const matchesSearch = !searchQuery ||
+      order.order_number?.toLowerCase().includes(searchQuery.toLowerCase());
 
-  const calculateTotals = () => {
-    const totalSpent = orders.reduce((sum, order) => sum + (parseFloat(String(order.total_amount || 0))), 0);
-    const totalRebate = orders.reduce((sum, order) => sum + (parseFloat(String(order.rebate_amount || 0))), 0);
-    
-    const eligible = orders.filter(order => {
-      const eligibleDate = addMonths(new Date(order.order_date), 6);
-      return isAfter(new Date(), eligibleDate);
-    });
-    
-    const eligibleRebate = eligible.reduce((sum, order) => sum + (parseFloat(String(order.rebate_amount || 0))), 0);
+    let matchesStatus = true;
+    if (filterStatus === "eligible") {
+      // Orders under expired contracts with unpaid rebate
+      matchesStatus = order.contract_status === 'expired' && order.rebate_status !== 'paid';
+    } else if (filterStatus === "pending") {
+      matchesStatus = order.customer_status === 'pending';
+    }
 
-    return { totalSpent, totalRebate, eligibleRebate, eligibleCount: eligible.length };
+    return matchesSearch && matchesStatus;
+  });
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > totalPages) return;
+    setLoading(true);
+    loadData(newPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-
-  const totals = calculateTotals();
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-900">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen p-6 md:p-8 bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-8 text-center">
+            <ShoppingCart className="w-12 h-12 text-red-400 mx-auto mb-4" />
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">Could not load orders</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">{loadError}</p>
+            <Button onClick={() => { setLoadError(null); setLoading(true); loadData(1); }}>
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -111,6 +129,7 @@ export default function MyOrders() {
           <p className="text-slate-600 dark:text-slate-400">Track your orders and rebate eligibility</p>
         </div>
 
+        {/* Stats — always reflect ALL orders via API totals, not just current page */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-xl shadow-blue-500/30">
             <CardContent className="p-6">
@@ -118,7 +137,7 @@ export default function MyOrders() {
                 <Package className="w-8 h-8 opacity-80" />
               </div>
               <p className="text-blue-100 text-sm mb-1">Total Orders</p>
-              <p className="text-3xl font-bold">{orders.length}</p>
+              <p className="text-3xl font-bold">{totalCount}</p>
             </CardContent>
           </Card>
 
@@ -128,7 +147,7 @@ export default function MyOrders() {
                 <DollarSign className="w-8 h-8 opacity-80" />
               </div>
               <p className="text-purple-100 text-sm mb-1">Total Spent</p>
-              <p className="text-3xl font-bold">Tsh {totals.totalSpent.toFixed(2)}</p>
+              <p className="text-3xl font-bold">Tsh {grandTotalAmount.toFixed(2)}</p>
             </CardContent>
           </Card>
 
@@ -137,8 +156,8 @@ export default function MyOrders() {
               <div className="flex items-center justify-between mb-2">
                 <ShoppingCart className="w-8 h-8 opacity-80" />
               </div>
-              <p className="text-green-100 text-sm mb-1">Available Rebate</p>
-              <p className="text-3xl font-bold">Tsh {totals.eligibleRebate.toFixed(2)}</p>
+              <p className="text-green-100 text-sm mb-1">Rebate Due</p>
+              <p className="text-3xl font-bold">Tsh {unpaidEligibleRebate.toFixed(2)}</p>
             </CardContent>
           </Card>
 
@@ -148,7 +167,7 @@ export default function MyOrders() {
                 <Calendar className="w-8 h-8 opacity-80" />
               </div>
               <p className="text-amber-100 text-sm mb-1">Total Rebate</p>
-              <p className="text-3xl font-bold">Tsh {totals.totalRebate.toFixed(2)}</p>
+              <p className="text-3xl font-bold">Tsh {grandTotalRebate.toFixed(2)}</p>
             </CardContent>
           </Card>
         </div>
@@ -165,10 +184,10 @@ export default function MyOrders() {
             <CardContent className="flex flex-col items-center justify-center py-16">
               <ShoppingCart className="w-16 h-16 text-slate-300 dark:text-slate-600 mb-4" />
               <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
-                {orders.length === 0 ? 'No Orders Yet' : 'No Orders Found'}
+                {totalCount === 0 ? 'No Orders Yet' : 'No Orders Found'}
               </h3>
               <p className="text-slate-600 dark:text-slate-400 text-center">
-                {orders.length === 0 
+                {totalCount === 0
                   ? 'Your orders will appear here once staff adds them to the system.'
                   : 'Try adjusting your search or filters.'}
               </p>
@@ -177,8 +196,40 @@ export default function MyOrders() {
         ) : (
           <div className="grid gap-6">
             {filteredOrders.map((order) => (
-              <OrderCard key={order.id} order={order} onRefresh={loadData} />
+              <OrderCard key={order.id} order={order} onRefresh={() => loadData(currentPage)} />
             ))}
+          </div>
+        )}
+
+        {/* Pagination controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-3 pt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage <= 1 || loading}
+              className="flex items-center gap-1"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Prev
+            </Button>
+
+            <span className="text-sm text-slate-600 dark:text-slate-400 px-2">
+              Page {currentPage} of {totalPages}
+              <span className="ml-2 text-slate-400 dark:text-slate-500">({totalCount} orders)</span>
+            </span>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage >= totalPages || loading}
+              className="flex items-center gap-1"
+            >
+              Next
+              <ChevronRight className="w-4 h-4" />
+            </Button>
           </div>
         )}
       </div>

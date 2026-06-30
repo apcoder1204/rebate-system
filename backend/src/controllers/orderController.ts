@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import pool from '../db/connection';
+import pool, { readQuery } from '../db/connection';
 import { AuthRequest } from '../middleware/auth';
 import { isValidUUID, sanitizeString, sanitizeNumber, sanitizeSortBy, isValidDate, isValidOrderStatus, sanitizePagination } from '../middleware/validation';
 
@@ -623,13 +623,14 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
       WHERE 1=1
     `;
     
-    // Build data query
+    // Build data query — includes contract_status so frontend knows if rebate is payable
     let query = `
-      SELECT 
+      SELECT
         o.*,
         u.full_name as customer_name,
         u.email as customer_email,
         c.contract_number,
+        c.status as contract_status,
         creator.full_name as creator_name
       FROM orders o
       LEFT JOIN users u ON o.customer_id = u.id
@@ -637,19 +638,32 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
       LEFT JOIN users creator ON o.created_by = creator.id
       WHERE 1=1
     `;
-    
+
+    // Totals query (same filters, no pagination) — used for stat cards
+    let totalsQuery = `
+      SELECT
+        COALESCE(SUM(o.total_amount), 0) as total_amount,
+        COALESCE(SUM(o.rebate_amount), 0) as total_rebate,
+        COALESCE(SUM(CASE WHEN o.rebate_status = 'unpaid' THEN o.rebate_amount ELSE 0 END), 0) as unpaid_eligible_rebate
+      FROM orders o
+      LEFT JOIN contracts c ON o.contract_id = c.id
+      WHERE 1=1
+    `;
+
     const params: any[] = [];
     let paramCount = 1;
-    
+
     // Apply role-based filtering - IDOR protection
     if (req.user!.role === 'user') {
       query += ` AND o.customer_id = $${paramCount}`;
       countQuery += ` AND o.customer_id = $${paramCount}`;
+      totalsQuery += ` AND o.customer_id = $${paramCount}`;
       params.push(req.user!.id);
       paramCount++;
     } else if (req.user!.role === 'staff') {
       query += ` AND o.created_by = $${paramCount}`;
       countQuery += ` AND o.created_by = $${paramCount}`;
+      totalsQuery += ` AND o.created_by = $${paramCount}`;
       params.push(req.user!.id);
       paramCount++;
     } else if (customer_id) {
@@ -659,10 +673,11 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
       }
       query += ` AND o.customer_id = $${paramCount}`;
       countQuery += ` AND o.customer_id = $${paramCount}`;
+      totalsQuery += ` AND o.customer_id = $${paramCount}`;
       params.push(customer_id);
       paramCount++;
     }
-    
+
     if (customer_status) {
       // Validate status
       if (!isValidOrderStatus(customer_status as string)) {
@@ -670,46 +685,53 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
       }
       query += ` AND o.customer_status = $${paramCount}`;
       countQuery += ` AND o.customer_status = $${paramCount}`;
+      totalsQuery += ` AND o.customer_status = $${paramCount}`;
       params.push(customer_status);
       paramCount++;
     }
-    
+
     // Date range filtering
     if (start_date && isValidDate(start_date as string)) {
       query += ` AND o.order_date >= $${paramCount}`;
       countQuery += ` AND o.order_date >= $${paramCount}`;
+      totalsQuery += ` AND o.order_date >= $${paramCount}`;
       params.push(start_date);
       paramCount++;
     }
-    
+
     if (end_date && isValidDate(end_date as string)) {
       query += ` AND o.order_date <= $${paramCount}`;
       countQuery += ` AND o.order_date <= $${paramCount}`;
+      totalsQuery += ` AND o.order_date <= $${paramCount}`;
       params.push(end_date);
       paramCount++;
     }
-    
+
     // Amount range filtering
     if (min_amount) {
       const minAmount = sanitizeNumber(min_amount, 0);
       if (minAmount !== null) {
         query += ` AND o.total_amount >= $${paramCount}`;
         countQuery += ` AND o.total_amount >= $${paramCount}`;
+        totalsQuery += ` AND o.total_amount >= $${paramCount}`;
         params.push(minAmount);
         paramCount++;
       }
     }
-    
+
     if (max_amount) {
       const maxAmount = sanitizeNumber(max_amount, 0);
       if (maxAmount !== null) {
         query += ` AND o.total_amount <= $${paramCount}`;
         countQuery += ` AND o.total_amount <= $${paramCount}`;
+        totalsQuery += ` AND o.total_amount <= $${paramCount}`;
         params.push(maxAmount);
         paramCount++;
       }
     }
-    
+
+    const filterParams = params.slice(0, paramCount - 1);
+
     // Safe sort by (whitelisted)
     if (sortBy.startsWith('-')) {
       const field = sortBy.substring(1);
@@ -717,18 +739,25 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
     } else {
       query += ` ORDER BY o.${sortBy} ASC`;
     }
-    
+
     // Add pagination
     query += ` LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
     params.push(limit, offset);
-    
-    // Get total count
-    const countResult = await pool.query(countQuery, params.slice(0, paramCount - 1));
+
+    // Run count, totals, and paginated data in parallel
+    const [countResult, totalsResult, result] = await Promise.all([
+      pool.query(countQuery, filterParams),
+      pool.query(totalsQuery, filterParams),
+      pool.query(query, params),
+    ]);
+
     const total = parseInt(countResult.rows[0].total, 10);
-    
-    // Get paginated results
-    const result = await pool.query(query, params);
-    
+    const totals = {
+      totalAmount: parseFloat(totalsResult.rows[0].total_amount),
+      totalRebate: parseFloat(totalsResult.rows[0].total_rebate),
+      unpaidEligibleRebate: parseFloat(totalsResult.rows[0].unpaid_eligible_rebate),
+    };
+
     // Fetch order items for each order
     const ordersWithItems = await Promise.all(
       result.rows.map(async (order: any) => {
@@ -742,7 +771,7 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
         };
       })
     );
-    
+
     res.json({
       data: ordersWithItems,
       pagination: {
@@ -750,7 +779,8 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
         pageSize: limit,
         total,
         totalPages: Math.ceil(total / limit)
-      }
+      },
+      totals,
     });
   } catch (error) {
     console.error('Filter orders error:', error);
@@ -758,3 +788,46 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
   }
 };
 
+
+export const getDashboardStats = async (req: AuthRequest, res: Response) => {
+  try {
+    const isStaff = ['admin', 'manager', 'staff'].includes(req.user!.role);
+
+    let result;
+    if (isStaff) {
+      result = await readQuery(`
+        SELECT
+          (SELECT COUNT(*)::int FROM contracts) AS total_contracts,
+          (SELECT COUNT(*)::int FROM contracts WHERE status IN ('active','approved')) AS active_contracts,
+          (SELECT COUNT(*)::int FROM orders) AS total_orders,
+          COALESCE((SELECT SUM(total_amount) FROM orders), 0)::numeric AS total_spent,
+          COALESCE((SELECT SUM(rebate_amount) FROM orders WHERE rebate_status != 'paid'), 0)::numeric AS available_rebate,
+          COALESCE((SELECT SUM(rebate_amount) FROM orders WHERE rebate_status = 'paid'), 0)::numeric AS paid_rebate
+      `);
+    } else {
+      const userId = req.user!.id;
+      result = await readQuery(`
+        SELECT
+          (SELECT COUNT(*)::int FROM contracts WHERE customer_id = $1) AS total_contracts,
+          (SELECT COUNT(*)::int FROM contracts WHERE customer_id = $1 AND status IN ('active','approved')) AS active_contracts,
+          (SELECT COUNT(*)::int FROM orders WHERE customer_id = $1) AS total_orders,
+          COALESCE((SELECT SUM(total_amount) FROM orders WHERE customer_id = $1), 0)::numeric AS total_spent,
+          COALESCE((SELECT SUM(rebate_amount) FROM orders WHERE customer_id = $1 AND rebate_status != 'paid'), 0)::numeric AS available_rebate,
+          COALESCE((SELECT SUM(rebate_amount) FROM orders WHERE customer_id = $1 AND rebate_status = 'paid'), 0)::numeric AS paid_rebate
+      `, [userId]);
+    }
+
+    const row = result.rows[0];
+    res.json({
+      totalContracts: row.total_contracts || 0,
+      activeContracts: row.active_contracts || 0,
+      totalOrders: row.total_orders || 0,
+      totalSpent: parseFloat(row.total_spent) || 0,
+      availableRebate: parseFloat(row.available_rebate) || 0,
+      paidRebate: parseFloat(row.paid_rebate) || 0,
+    });
+  } catch (error) {
+    console.error('Dashboard stats error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};

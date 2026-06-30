@@ -17,6 +17,7 @@ import ChangePassword from "./Pages/ChangePassword";
 import Settings from "./Pages/Settings";
 import SystemSettingsPage from "./Pages/SystemSettings";
 import Reports from "./Pages/Reports";
+import RebateSettingsPage from "./Pages/RebateSettings";
 import { routes } from "./utils";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { ToastProvider } from "./Context/ToastContext";
@@ -125,13 +126,21 @@ const App = () => (
               </ProtectedRoute>
             } 
           />
-          <Route 
+          <Route
             path="/reports"
             element={
               <ProtectedRoute requiredRole={['admin', 'manager']}>
                 <Layout><Reports /></Layout>
               </ProtectedRoute>
-            } 
+            }
+          />
+          <Route
+            path="/rebate-settings"
+            element={
+              <ProtectedRoute requiredRole={['admin', 'manager', 'staff']}>
+                <Layout><RebateSettingsPage /></Layout>
+              </ProtectedRoute>
+            }
           />
           <Route path="*" element={<Navigate to={routes.Home} replace />} />
             </Routes>

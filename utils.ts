@@ -9,6 +9,7 @@ export const routes = {
   Profile: "/profile",
   ChangePassword: "/change-password",
   Settings: "/settings",
+  RebateSettings: "/rebate-settings",
   Login: "/login",
   Register: "/register",
   ForgotPassword: "/forgot-password",

@@ -10,6 +10,7 @@ router.get('/filter', authenticate, contractController.filterContracts);
 router.get('/export/csv', authenticate, exportContractsCSV);
 router.get('/:id', authenticate, contractController.getContract);
 router.post('/', authenticate, contractController.createContract);
+router.post('/:id/renew', authenticate, contractController.renewContract);
 router.put('/:id', authenticate, contractController.updateContract);
 router.delete('/:id', authenticate, contractController.deleteContract);
 

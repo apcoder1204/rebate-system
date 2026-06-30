@@ -24,6 +24,8 @@ export type ContractType = {
   approver_name?: string;
   created_date?: string;
   updated_date?: string;
+  renewed_from_id?: string;
+  renewal_count?: number;
 };
 
 export type ContractFilters = {
@@ -130,6 +132,9 @@ export const Contract = {
     await apiRequest(`/contracts/${id}`, {
       method: 'DELETE',
     });
+  },
+  async renew(id: string): Promise<ContractType> {
+    return apiRequest(`/contracts/${id}/renew`, { method: 'POST' });
   },
   async exportCSV(filters?: ContractFilters): Promise<Blob> {
     const params = new URLSearchParams();

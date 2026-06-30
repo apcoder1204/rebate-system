@@ -30,6 +30,15 @@ export type OrderType = {
   is_locked?: boolean;
   locked_date?: string;
   manually_unlocked?: boolean;
+  contract_status?: string;
+  rebate_status?: 'unpaid' | 'paid';
+  rebate_paid_date?: string;
+};
+
+export type OrderTotals = {
+  totalAmount: number;
+  totalRebate: number;
+  unpaidEligibleRebate: number;
 };
 
 export type PaginatedResponse<T> = {
@@ -40,6 +49,7 @@ export type PaginatedResponse<T> = {
     total: number;
     totalPages: number;
   };
+  totals?: OrderTotals;
 };
 
 export type OrderFilters = {
@@ -144,6 +154,16 @@ export const Order = {
     await apiRequest(`/orders/${id}`, {
       method: 'DELETE',
     });
+  },
+  async getDashboardStats(): Promise<{
+    totalContracts: number;
+    activeContracts: number;
+    totalOrders: number;
+    totalSpent: number;
+    availableRebate: number;
+    paidRebate: number;
+  }> {
+    return apiRequest('/orders/stats');
   },
   async exportCSV(filters?: OrderFilters): Promise<Blob> {
     const params = new URLSearchParams();

@@ -2,15 +2,22 @@ import { Response } from 'express';
 import pool from '../db/connection';
 import { AuthRequest } from '../middleware/auth';
 import { isValidUUID, sanitizeString, sanitizeNumber, sanitizeSortBy, isValidDate, isValidContractStatus, sanitizePagination } from '../middleware/validation';
+import { AuditService } from '../services/auditService';
 
 export const listContracts = async (req: AuthRequest, res: Response) => {
   try {
+    // Auto-expire contracts whose end_date has passed (same pattern as order auto-lock)
+    await pool.query(
+      `UPDATE contracts SET status = 'expired'
+       WHERE end_date < CURRENT_DATE AND status IN ('active', 'approved')`
+    );
+
     const sortBy = sanitizeSortBy(
       req.query.sortBy as string,
       ['created_date', 'start_date', 'end_date'],
       'created_date'
     );
-    
+
     // Get pagination parameters
     const { page, limit, offset } = sanitizePagination(
       req.query.page as string | number | undefined,
@@ -279,16 +286,17 @@ export const createContract = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ error: 'You can only create contracts for yourself' });
     }
     
-    // Check if user already has a contract (only for regular users)
+    // Block new contract only if an active/pending one already exists (expired ones are fine — renewal creates new)
     if (req.user!.role === 'user' || customer_id === req.user!.id) {
       const existingContractCheck = await pool.query(
-        'SELECT id FROM contracts WHERE customer_id = $1',
+        `SELECT id FROM contracts
+         WHERE customer_id = $1 AND status NOT IN ('expired', 'cancelled', 'rejected')`,
         [customer_id]
       );
-      
+
       if (existingContractCheck.rows.length > 0) {
-        return res.status(400).json({ 
-          error: 'You already have a contract. You can only have one contract at a time. Please manage your existing contract.' 
+        return res.status(400).json({
+          error: 'You already have an active or pending contract. Please wait for it to expire before creating a new one.',
         });
       }
     }
@@ -695,6 +703,88 @@ export const filterContracts = async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     console.error('Filter contracts error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const renewContract = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!isValidUUID(id)) {
+      return res.status(400).json({ error: 'Invalid contract ID format' });
+    }
+
+    // Load source contract
+    const sourceResult = await pool.query(
+      'SELECT * FROM contracts WHERE id = $1',
+      [id]
+    );
+    if (sourceResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Contract not found' });
+    }
+    const source = sourceResult.rows[0];
+
+    // Customers can only renew their own contracts
+    if (req.user!.role === 'user' && source.customer_id !== req.user!.id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Only expired contracts can be renewed
+    if (source.status !== 'expired') {
+      return res.status(400).json({ error: 'Only expired contracts can be renewed' });
+    }
+
+    // Prevent duplicate renewal (if an open renewal already exists)
+    const duplicateCheck = await pool.query(
+      `SELECT id FROM contracts
+       WHERE renewed_from_id = $1
+         AND status NOT IN ('expired', 'cancelled', 'rejected')`,
+      [id]
+    );
+    if (duplicateCheck.rows.length > 0) {
+      return res.status(400).json({ error: 'A renewal for this contract already exists' });
+    }
+
+    // New contract: start today, end 6 months from today
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setMonth(endDate.getMonth() + 6);
+    const startDateStr = today.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
+
+    const newRenewalCount = (source.renewal_count || 0) + 1;
+    const contractNumber = `CNT-${Date.now()}`;
+
+    const result = await pool.query(
+      `INSERT INTO contracts
+         (customer_id, contract_number, start_date, end_date, rebate_percentage,
+          status, renewed_from_id, renewal_count)
+       VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7)
+       RETURNING *`,
+      [
+        source.customer_id,
+        contractNumber,
+        startDateStr,
+        endDateStr,
+        source.rebate_percentage,
+        id,
+        newRenewalCount,
+      ]
+    );
+
+    await AuditService.log(
+      req.user!.id,
+      'renew_contract',
+      'contract',
+      result.rows[0].id,
+      { source_contract_id: id, renewal_count: newRenewalCount },
+      req.ip
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Renew contract error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

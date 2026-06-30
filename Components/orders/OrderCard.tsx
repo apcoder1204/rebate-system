@@ -6,7 +6,7 @@ import { Badge } from "@/Components/ui/badge";
 import { Button } from "@/Components/ui/button";
 import { Textarea } from "@/Components/ui/textarea";
 import { ShoppingCart, Calendar, DollarSign, Package, CheckCircle, Clock, XCircle, MessageSquare, AlertTriangle, Lock } from "lucide-react";
-import { format, addMonths, isAfter, differenceInDays, addDays } from "date-fns";
+import { format, differenceInDays, addDays } from "date-fns";
 import { useToast } from "@/Context/ToastContext";
 import { OrderType } from "@/entities/Order";
 
@@ -41,9 +41,6 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
     fetchAutoLockDays();
   }, []);
 
-  const eligibleDate = addMonths(new Date(order.order_date), 6);
-  const isEligible = isAfter(new Date(), eligibleDate);
-  
   // Calculate days since order creation and lock status using configured auto_lock_days
   const orderDate = new Date(order.order_date);
   const daysSinceOrder = differenceInDays(new Date(), orderDate);
@@ -140,9 +137,9 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
             {getStatusBadge()}
             <Badge
               variant="secondary"
-              className={isEligible ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}
+              className={order.rebate_status === 'paid' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : order.contract_status === 'expired' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}
             >
-              {isEligible ? 'Rebate Ready' : 'Rebate Pending'}
+              {order.rebate_status === 'paid' ? 'Rebate Paid' : order.contract_status === 'expired' ? 'Rebate Pending' : 'Active Contract'}
             </Badge>
           </div>
         </div>
@@ -155,7 +152,12 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
             </p>
           </div>
           <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-            <p className="text-xs text-green-700 dark:text-green-400 mb-1">Rebate (1%)</p>
+            <p className="text-xs text-green-700 dark:text-green-400 mb-1">
+              Rebate
+              {order.rebate_status === 'paid' && (
+                <span className="ml-1 text-green-600 dark:text-green-400">✓ Paid</span>
+              )}
+            </p>
             <p className="font-bold text-green-700 dark:text-green-400 text-lg">
               Tsh {parseFloat(String(order.rebate_amount || 0)).toFixed(2)}
             </p>
@@ -168,11 +170,19 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
           </div>
         </div>
 
-        {!isEligible && (
+        {order.contract_status === 'expired' && order.rebate_status === 'paid' && (
+          <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg mb-4">
+            <p className="text-sm text-green-800 dark:text-green-200 flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 flex-shrink-0" />
+              Rebate paid
+            </p>
+          </div>
+        )}
+        {order.contract_status === 'expired' && order.rebate_status !== 'paid' && (
           <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg mb-4">
-            <p className="text-sm text-amber-800 dark:text-amber-200">
-              <Clock className="w-4 h-4 inline mr-2" />
-              Rebate available on {format(eligibleDate, 'MMMM d, yyyy')}
+            <p className="text-sm text-amber-800 dark:text-amber-200 flex items-center gap-2">
+              <Clock className="w-4 h-4 flex-shrink-0" />
+              Contract expired — rebate payment pending
             </p>
           </div>
         )}

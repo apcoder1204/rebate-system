@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import pool from '../db/connection';
+import { CacheService } from '../services/cacheService';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -33,21 +34,24 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
       return res.status(401).json({ error: 'Invalid token structure' });
     }
 
-    // Check if user is active - DB check for security
-    // We cache this check for 1 minute to avoid hammering DB on every request if needed
-    // But for now, direct check for immediate deactivation effect
+    // Check if user is active — cached in Redis for 60 s to reduce DB load on every request.
+    // Cache is invalidated immediately when an admin toggles a user's active status.
     try {
-      const userResult = await pool.query('SELECT is_active FROM users WHERE id = $1', [decoded.id]);
-      if (userResult.rows.length === 0) {
-        return res.status(401).json({ error: 'User not found' });
+      const cacheKey = `auth:user:${decoded.id}`;
+      let userData = await CacheService.get<{ is_active: boolean }>(cacheKey);
+      if (!userData) {
+        const userResult = await pool.query('SELECT is_active FROM users WHERE id = $1', [decoded.id]);
+        if (userResult.rows.length === 0) {
+          return res.status(401).json({ error: 'User not found' });
+        }
+        userData = userResult.rows[0] as { is_active: boolean };
+        await CacheService.set(cacheKey, userData, 60);
       }
-      if (userResult.rows[0].is_active === false) {
+      if (userData.is_active === false) {
         return res.status(403).json({ error: 'Account is inactive. Please contact support.' });
       }
     } catch (dbError) {
       console.error('Auth DB check failed:', dbError);
-      // Proceed cautiously or fail secure? 
-      // Failing secure for authentication critical path
       return res.status(500).json({ error: 'Authentication check failed' });
     }
     

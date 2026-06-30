@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { SystemSettings } from '../services/systemSettings';
 import { AuditService } from '../services/auditService';
+import { CacheService } from '../services/cacheService';
 import { sendOrderReminders } from '../services/orderReminderService';
 import pool from '../db/connection';
 import { isValidUUID } from '../middleware/validation';
@@ -10,6 +11,9 @@ import { isValidUUID } from '../middleware/validation';
 
 export const getSettings = async (req: AuthRequest, res: Response) => {
   try {
+    if (!['admin', 'manager', 'staff'].includes(req.user!.role)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
     const settings = await SystemSettings.getAll();
     res.json(settings);
   } catch (error) {
@@ -118,6 +122,9 @@ export const toggleUserActive = async (req: AuthRequest, res: Response) => {
       'UPDATE users SET is_active = $1, updated_date = CURRENT_TIMESTAMP WHERE id = $2',
       [is_active, id]
     );
+
+    // Invalidate auth cache so change takes effect on next request
+    await CacheService.del(`auth:user:${id}`);
 
     // Log action
     await AuditService.log(

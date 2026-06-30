@@ -3,7 +3,6 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../db/connection';
 import { AuthRequest } from '../middleware/auth';
-import * as twilioService from '../services/twilioService';
 import * as emailService from '../services/emailService';
 import { sanitizeString, isValidEmail, isValidPhone, isValidUUID, sanitizeNumber, sanitizePagination, isValidRole } from '../middleware/validation';
 
@@ -643,165 +642,18 @@ export const getMyRoleRequest = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// Send verification code
-export const sendVerificationCode = async (req: Request, res: Response) => {
-  try {
-    const { phone, purpose } = req.body;
-    
-    if (!phone || typeof phone !== 'string') {
-      return res.status(400).json({ error: 'Phone number is required' });
-    }
-    
-    if (!purpose || !['registration', 'password_reset'].includes(purpose)) {
-      return res.status(400).json({ error: 'Invalid purpose. Use "registration" or "password_reset"' });
-    }
-    
-    // Validate phone format
-    if (!isValidPhone(phone)) {
-      return res.status(400).json({ error: 'Invalid phone number format' });
-    }
-    
-    // For password reset, check if user exists
-    if (purpose === 'password_reset') {
-      let formattedPhone = phone.trim();
-      if (!formattedPhone.startsWith('+')) {
-        if (formattedPhone.startsWith('0')) {
-          formattedPhone = '+255' + formattedPhone.substring(1);
-        } else {
-          formattedPhone = '+255' + formattedPhone;
-        }
-      }
-      
-      const userResult = await pool.query(
-        'SELECT id FROM users WHERE phone = $1',
-        [formattedPhone]
-      );
-      
-      if (userResult.rows.length === 0) {
-        return res.status(404).json({ error: 'No account found with this phone number' });
-      }
-    }
-    
-    const result = await twilioService.sendVerificationCode(phone, purpose);
-    
-    if (!result.success) {
-      return res.status(400).json({ error: result.message || 'Failed to send verification code' });
-    }
-    
-    res.json({
-      message: result.message || 'Verification code sent successfully',
-      // Only return code in dev mode for registration, not password reset
-      ...(result.code && purpose === 'registration' && { code: result.code, dev_mode: true }),
-    });
-  } catch (error) {
-    console.error('Send verification code error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+// Phone-based verification routes — Twilio was removed; app uses email verification instead.
+// These stubs keep the routes registered so existing clients don't get 404s.
+export const sendVerificationCode = async (_req: Request, res: Response) => {
+  res.status(501).json({ error: 'Phone verification is not configured. Use email verification instead.' });
 };
 
-// Verify code
-export const verifyCode = async (req: Request, res: Response) => {
-  try {
-    const { phone, code, purpose } = req.body;
-    
-    if (!phone || !code || !purpose) {
-      return res.status(400).json({ error: 'Phone, code, and purpose are required' });
-    }
-    
-    if (typeof phone !== 'string' || typeof code !== 'string' || typeof purpose !== 'string') {
-      return res.status(400).json({ error: 'Invalid input types' });
-    }
-    
-    if (!isValidPhone(phone)) {
-      return res.status(400).json({ error: 'Invalid phone number format' });
-    }
-    
-    // Validate code format (6 digits)
-    if (!/^\d{6}$/.test(code)) {
-      return res.status(400).json({ error: 'Verification code must be 6 digits' });
-    }
-    
-    if (!['registration', 'password_reset'].includes(purpose)) {
-      return res.status(400).json({ error: 'Invalid purpose' });
-    }
-    
-    const result = await twilioService.verifyCode(phone, code, purpose as 'registration' | 'password_reset');
-    
-    if (!result.success) {
-      return res.status(400).json({ error: result.message || 'Verification failed' });
-    }
-    
-    res.json({ message: result.message || 'Code verified successfully' });
-  } catch (error) {
-    console.error('Verify code error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+export const verifyCode = async (_req: Request, res: Response) => {
+  res.status(501).json({ error: 'Phone verification is not configured. Use email verification instead.' });
 };
 
-// Reset password (phone-based - legacy)
-export const resetPassword = async (req: Request, res: Response) => {
-  try {
-    const { phone, verification_code, new_password } = req.body;
-    
-    if (!phone || !verification_code || !new_password) {
-      return res.status(400).json({ error: 'Phone, verification code, and new password are required' });
-    }
-    
-    if (typeof phone !== 'string' || typeof verification_code !== 'string' || typeof new_password !== 'string') {
-      return res.status(400).json({ error: 'Invalid input types' });
-    }
-    
-    if (!isValidPhone(phone)) {
-      return res.status(400).json({ error: 'Invalid phone number format' });
-    }
-    
-    // Validate verification code format
-    if (!/^\d{6}$/.test(verification_code)) {
-      return res.status(400).json({ error: 'Verification code must be 6 digits' });
-    }
-    
-    if (new_password.length < 6 || new_password.length > 128) {
-      return res.status(400).json({ error: 'Password must be between 6 and 128 characters' });
-    }
-    
-    // Verify code first
-    const verification = await twilioService.verifyCode(phone, verification_code, 'password_reset');
-    if (!verification.success) {
-      return res.status(400).json({ error: verification.message || 'Invalid verification code' });
-    }
-    
-    // Format phone number
-    let formattedPhone = phone.trim();
-    if (!formattedPhone.startsWith('+')) {
-      if (formattedPhone.startsWith('0')) {
-        formattedPhone = '+255' + formattedPhone.substring(1);
-      } else {
-        formattedPhone = '+255' + formattedPhone;
-      }
-    }
-    
-    // Find user by phone
-    const userResult = await pool.query(
-      'SELECT id FROM users WHERE phone = $1',
-      [formattedPhone]
-    );
-    
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    // Update password
-    const hashedPassword = await bcrypt.hash(new_password, 10);
-    await pool.query(
-      'UPDATE users SET password_hash = $1 WHERE id = $2',
-      [hashedPassword, userResult.rows[0].id]
-    );
-    
-    res.json({ message: 'Password reset successfully. Please login with your new password.' });
-  } catch (error) {
-    console.error('Reset password error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+export const resetPassword = async (_req: Request, res: Response) => {
+  res.status(501).json({ error: 'Phone-based password reset is not configured. Use email reset instead.' });
 };
 
 // ==================== EMAIL-BASED VERIFICATION (Resend) ====================

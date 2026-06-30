@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import { RedisStore } from 'rate-limit-redis';
 import helmet from 'helmet';
 import jwt from 'jsonwebtoken';
+import redis from '../db/redis';
 
 /**
  * Security headers middleware
@@ -18,28 +20,32 @@ export const securityHeaders = helmet({
   crossOriginEmbedderPolicy: false, // Allow file uploads
 });
 
+// Build optional Redis store for rate limiters (enables distributed rate limiting across instances)
+const makeRedisStore = (prefix: string) =>
+  redis
+    ? new RedisStore({
+        sendCommand: (...args: string[]) => (redis as any).call(...args),
+        prefix,
+      })
+    : undefined;
+
 /**
  * Rate limiting for authentication endpoints
  */
 export const authRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  // Allow more room overall, but only count failed attempts
   max: process.env.NODE_ENV === 'production' ? 50 : 200,
   message: 'Too many authentication attempts, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
-  // Only count failed logins (4xx/5xx). Successful logins are skipped.
   skipSuccessfulRequests: true,
+  store: makeRedisStore('rl:auth:'),
   keyGenerator: (req: Request) => {
     const email = typeof req.body?.email === 'string' ? req.body.email.toLowerCase() : '';
-    // Use ipKeyGenerator helper for IPv6 compatibility
     const ip = ipKeyGenerator(req as any);
     return `${ip}:${email}`;
   },
-  skip: (req) => {
-    // Skip rate limiting for localhost in development
-    return process.env.NODE_ENV !== 'production' && req.ip === '::1';
-  },
+  skip: (req) => process.env.NODE_ENV !== 'production' && req.ip === '::1',
 });
 
 /**
@@ -48,30 +54,27 @@ export const authRateLimit = rateLimit({
  */
 export const apiRateLimit = rateLimit({
   windowMs: 150 * 60 * 1000, // 150 minutes
-  max: 500, // Limit each user to 500 requests per windowMs
+  max: 500,
   message: 'Too many requests, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  store: makeRedisStore('rl:api:'),
   keyGenerator: (req) => {
-    // Use user ID from token if authenticated, otherwise fall back to IP
     const token = req.headers.authorization?.split(' ')[1];
     if (token) {
       try {
         const jwtSecret = process.env.JWT_SECRET;
         if (jwtSecret && jwtSecret !== 'your-secret-key') {
           const decoded = jwt.verify(token, jwtSecret) as any;
-          if (decoded?.id) {
-            return decoded.id; // Per-user rate limiting
-          }
+          if (decoded?.id) return decoded.id;
         }
       } catch {
-        // Invalid token, fall back to IP
+        // fall through to IP
       }
     }
-    // Use ipKeyGenerator helper for IPv6 compatibility
-    return ipKeyGenerator(req as any); // Fall back to IP for unauthenticated requests
+    return ipKeyGenerator(req as any);
   },
-  skipSuccessfulRequests: false, // Count all requests
+  skipSuccessfulRequests: false,
 });
 
 /**
@@ -79,10 +82,11 @@ export const apiRateLimit = rateLimit({
  */
 export const passwordResetRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 3, // Limit each IP to 3 password reset attempts per hour
+  max: 3,
   message: 'Too many password reset attempts, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  store: makeRedisStore('rl:reset:'),
 });
 
 /**

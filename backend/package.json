@@ -19,20 +19,6 @@
     "migrate:order-reminder": "tsx src/db/migrate_order_reminder.ts"
   },
   "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "express-rate-limit": "^8.2.1",
-    "express-validator": "^7.3.1",
-    "helmet": "^8.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "multer": "^1.4.5-lts.1",
-    "pg": "^8.11.3",
-    "node-cron": "^3.0.3",
-    "resend": "^6.6.0",
-    "twilio": "^5.10.7",
-    "uuid": "^9.0.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
@@ -42,8 +28,23 @@
     "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.10.9",
     "@types/uuid": "^9.0.7",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.2.1",
+    "express-validator": "^7.3.1",
+    "helmet": "^8.1.0",
+    "ioredis": "^5.11.1",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^3.0.3",
+    "pg": "^8.11.3",
+    "rate-limit-redis": "^5.0.0",
+    "resend": "^6.6.0",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
-  },
-  "devDependencies": {}
+    "twilio": "^5.10.7",
+    "typescript": "^5.3.3",
+    "uuid": "^9.0.1"
+  }
 }

@@ -11,12 +11,15 @@ import { Card } from "@/Components/ui/card";
 
 import ContractsList from "@/Components/staff/ContractsList";
 import CreateContractDialog from "@/Components/staff/CreateContractDialog";
+import RebatePaymentDialog from "@/Components/staff/RebatePaymentDialog";
 
 export default function ManageContracts() {
   const [contracts, setContracts] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingContract, setEditingContract] = useState(null);
+  const [rebateDialogOpen, setRebateDialogOpen] = useState(false);
+  const [selectedContractForRebate, setSelectedContractForRebate] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
@@ -129,8 +132,8 @@ export default function ManageContracts() {
           </Button>
         </div>
 
-        <ContractsList 
-          contracts={contracts} 
+        <ContractsList
+          contracts={contracts}
           onRefresh={() => {
             setPage(1);
             loadContracts(1, pageSize);
@@ -139,6 +142,10 @@ export default function ManageContracts() {
           onEdit={(contract) => {
             setEditingContract(contract);
             setShowCreateDialog(true);
+          }}
+          onPayRebate={(contract) => {
+            setSelectedContractForRebate(contract);
+            setRebateDialogOpen(true);
           }}
         />
 
@@ -176,6 +183,24 @@ export default function ManageContracts() {
           customers={customers}
           editingContract={editingContract}
         />
+
+        {selectedContractForRebate && (
+          <RebatePaymentDialog
+            open={rebateDialogOpen}
+            onClose={() => {
+              setRebateDialogOpen(false);
+              setSelectedContractForRebate(null);
+            }}
+            onSuccess={() => {
+              setPage(1);
+              loadContracts(1, pageSize);
+            }}
+            customerId={selectedContractForRebate.customer_id}
+            contractId={selectedContractForRebate.id}
+            customerName={selectedContractForRebate.customer_name}
+            contractNumber={selectedContractForRebate.contract_number}
+          />
+        )}
       </div>
     </div>
   );

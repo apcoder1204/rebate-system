@@ -26,21 +26,17 @@ const neonConnectionString = ensurePoolerConfig(
 
 const primaryPool = new Pool({
   connectionString: neonConnectionString,
-  max: 20,
-  // For persistent connections: very long idle timeout since we actively maintain connections
-  // With our health checks and connection warmer, connections stay active
-  // Set to 30 minutes to prevent premature closures during long idle periods
-  idleTimeoutMillis: 1800000, // 30 minutes (connections are kept alive by health checks)
-  // Increase connection timeout for serverless (network latency)
-  connectionTimeoutMillis: 30000, // 30 seconds
-  // Statement timeout for long-running queries
-  statement_timeout: 60000, // 60 seconds
+  max: 10,
+  // Keep idle timeout shorter than Neon/pgbouncer's server-side idle timeout (~5 min).
+  // This ensures the Node pool evicts stale connections BEFORE the server silently drops them,
+  // preventing the "empty error message" silent-drop problem.
+  idleTimeoutMillis: 60000, // 1 minute — pool evicts before pgbouncer drops
+  connectionTimeoutMillis: 15000, // 15 seconds
   // Keep connections alive at TCP level
   keepAlive: true,
-  keepAliveInitialDelayMillis: 10000, // 10 seconds
+  keepAliveInitialDelayMillis: 5000,
   // SSL configuration
   ssl: process.env.NEON_DATABASE_URL ? { rejectUnauthorized: false } : undefined,
-  // Don't allow exit on idle - we want persistent connections
   allowExitOnIdle: false,
 });
 
@@ -205,18 +201,22 @@ function startConnectionWarmer(intervalMinutes: number = 2) {
   console.log(`🔥 Started connection warmer (every ${intervalMinutes} minutes)`);
 }
 
-// Reconnection logic for primary database
+// Reconnection logic for primary database.
+// Uses a fresh client.connect() to force a new TCP connection rather than
+// reusing a potentially stale idle client from the pool.
 async function reconnectPrimary(maxRetries: number = 3): Promise<boolean> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      await primaryPool.query('SELECT NOW()');
+      // Acquire a client directly to force a real new TCP connection
+      const client = await primaryPool.connect();
+      await client.query('SELECT 1');
+      client.release();
       console.log(`✅ Neon reconnected${attempt > 1 ? ` (after ${attempt} attempts)` : ''}`);
       return true;
     } catch (error: any) {
-      console.error(`⚠️  Reconnection attempt ${attempt}/${maxRetries} failed:`, error.message);
+      console.error(`⚠️  Reconnection attempt ${attempt}/${maxRetries} failed:`, error?.message || '(no message)');
       if (attempt < maxRetries) {
-        // Exponential backoff: 2s, 4s, 8s
-        const delay = Math.min(2000 * Math.pow(2, attempt - 1), 10000);
+        const delay = Math.min(1000 * attempt, 5000); // 1s, 2s, 3s
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -226,12 +226,10 @@ async function reconnectPrimary(maxRetries: number = 3): Promise<boolean> {
 
 // Initialize connections
 testConnections().then(() => {
-  // Start aggressive health check (every 60 seconds) to keep connections alive
-  // This prevents disconnections even after days of inactivity
-  startHealthCheck(60); // Check every 60 seconds
-  
-  // Start connection warmer (every 2 minutes) to maintain active connections
-  startConnectionWarmer(2); // Warm every 2 minutes
+  // Health check every 30 s — shorter than Neon's 5-min idle timeout
+  startHealthCheck(30);
+  // Connection warmer every 1 minute
+  startConnectionWarmer(1);
 });
 
 // Global error handler for unhandled errors
@@ -295,36 +293,22 @@ export async function dualQuery(
       const primaryResult = await primaryPool.query(queryText, params);
       results.primary = primaryResult;
     } catch (error: any) {
-      // Check if it's a connection error
-      const isConnectionError = 
-        error.message?.includes('connection') ||
-        error.message?.includes('ECONNREFUSED') ||
-        error.message?.includes('ETIMEDOUT') ||
-        error.message?.includes('Connection terminated') ||
-        error.message?.includes('server closed the connection') ||
-        error.code === '57P01' ||
-        error.code === '57P02' ||
-        error.code === '57P03';
-      
-      if (isConnectionError) {
-        console.warn('⚠️  Primary database query failed (connection error), attempting reconnection...');
-        // Try to reconnect and retry once
+      if (isTransientConnectionError(error)) {
+        console.warn('⚠️  Primary write failed (connection), reconnecting...');
         const reconnected = await reconnectPrimary(2);
         if (reconnected) {
           try {
-            // Retry the query after reconnection
-            const primaryResult = await primaryPool.query(queryText, params);
-            results.primary = primaryResult;
+            results.primary = await primaryPool.query(queryText, params);
           } catch (retryError: any) {
-            console.error('❌ Query failed after reconnection:', retryError.message);
+            console.error('❌ Write failed after reconnect:', retryError.message);
             results.error = retryError;
           }
         } else {
-          console.error('❌ Reconnection failed');
+          console.error('❌ Reconnection failed for write');
           results.error = error;
         }
       } else {
-        console.error('❌ Primary database query failed:', error.message);
+        console.error('❌ Primary write failed (SQL error):', error.message);
         results.error = error;
       }
       // Continue to backup even if primary fails
@@ -353,43 +337,62 @@ export async function dualQuery(
   }
 }
 
-// Read-only query (only from primary for performance)
-// With automatic reconnection on connection errors
+// Detect whether a pg error is a transient connection problem vs a real SQL error.
+// An empty/missing message means the TCP socket was silently dropped by Neon's pgbouncer.
+function isTransientConnectionError(error: any): boolean {
+  const msg: string = error?.message || '';
+  return (
+    msg === '' ||                                    // silent TCP drop (Neon idle timeout)
+    msg.includes('connect') ||
+    msg.includes('ECONNREFUSED') ||
+    msg.includes('ECONNRESET') ||
+    msg.includes('ETIMEDOUT') ||
+    msg.includes('Connection terminated') ||
+    msg.includes('server closed the connection') ||
+    msg.includes('SSL') ||
+    error?.code === '57P01' ||                       // Admin shutdown
+    error?.code === '57P02' ||                       // Crash shutdown
+    error?.code === '57P03' ||                       // Cannot connect now
+    error?.code === 'ECONNRESET' ||
+    error?.code === 'ETIMEDOUT'
+  );
+}
+
+// Read-only query — tries primary (Neon), reconnects on transient errors, falls back to backup.
+// SQL errors (bad column, syntax, etc.) are NOT retried on backup — both DBs would fail identically.
 export async function readQuery(queryText: string, params?: any[]): Promise<any> {
   try {
     return await primaryPool.query(queryText, params);
   } catch (error: any) {
-    // Check if it's a connection error that might be recoverable
-    const isConnectionError = 
-      error.message?.includes('connection') ||
-      error.message?.includes('ECONNREFUSED') ||
-      error.message?.includes('ETIMEDOUT') ||
-      error.message?.includes('Connection terminated') ||
-      error.message?.includes('server closed the connection') ||
-      error.code === '57P01' || // Admin shutdown
-      error.code === '57P02' || // Crash shutdown
-      error.code === '57P03';   // Cannot connect now
-    
-    if (isConnectionError) {
-      console.warn('⚠️  Primary read query failed (connection error), attempting reconnection...');
-      // Try to reconnect and retry once
-      const reconnected = await reconnectPrimary(2);
+    if (isTransientConnectionError(error)) {
+      // Neon dropped the connection — try to reconnect, then retry the query
+      console.warn('⚠️  Neon connection dropped, reconnecting...');
+      const reconnected = await reconnectPrimary(3);
       if (reconnected) {
         try {
-          // Retry the query after reconnection
           return await primaryPool.query(queryText, params);
         } catch (retryError: any) {
-          console.error('❌ Query failed after reconnection, trying backup:', retryError.message);
+          if (!isTransientConnectionError(retryError)) {
+            // SQL error after reconnect — don't bother with backup
+            throw retryError;
+          }
+          console.error('❌ Still failing after reconnect, using backup DB');
         }
       } else {
-        console.error('❌ Reconnection failed, trying backup');
+        console.error('❌ Neon reconnect failed, using backup DB');
+      }
+      // Fall through to backup
+      try {
+        return await backupPool.query(queryText, params);
+      } catch (backupErr: any) {
+        console.error('⚠️  Backup also failed:', backupErr.message);
+        throw error; // throw original Neon error
       }
     } else {
-      console.error('❌ Primary read query failed, trying backup:', error.message);
+      // Real SQL error (bad column name, constraint violation, etc.)
+      // Do NOT fall back — backup would return same error, masking the real problem
+      throw error;
     }
-    
-    // Fallback to backup for reads
-    return await backupPool.query(queryText, params);
   }
 }
 

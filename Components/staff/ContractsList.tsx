@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/Components/ui/card";
 import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
 import { Badge } from "@/Components/ui/badge";
-import { Search, FileText, Calendar, User, Mail, Eye, Edit, Percent, Trash2, CheckCircle } from "lucide-react";
+import { Search, FileText, Calendar, User, Mail, Eye, Edit, Percent, Trash2, CheckCircle, RefreshCw, CreditCard } from "lucide-react";
 import { format } from "date-fns";
 import { ContractPreviewDialog, ManagerApprovalDialog } from "@/Components/contracts";
 import { User as UserEntity } from "@/entities/User";
@@ -15,9 +15,10 @@ interface ContractsListProps {
   onRefresh: () => void;
   onEdit: (contract: any) => void;
   currentUserRole?: string;
+  onPayRebate?: (contract: any) => void;
 }
 
-export default function ContractsList({ contracts, onRefresh, onEdit, currentUserRole }: ContractsListProps) {
+export default function ContractsList({ contracts, onRefresh, onEdit, currentUserRole, onPayRebate }: ContractsListProps) {
   const { showSuccess, showError, showWarning } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedContract, setSelectedContract] = useState<any>(null);
@@ -27,6 +28,7 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
   const [currentUser, setCurrentUser] = useState<any>(null);
   const canApprove = ['admin', 'manager', 'staff'].includes(currentUserRole || '');
   const canModify = ['admin', 'manager'].includes(currentUserRole || '');
+  const canPayRebate = ['admin', 'manager', 'staff'].includes(currentUserRole || '');
 
   // Load current user for approval
   React.useEffect(() => {
@@ -130,6 +132,18 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
     }
   };
 
+  const handleRenew = async (contract: any) => {
+    if (window.confirm(`Renew contract ${contract.contract_number} for ${contract.customer_name}? A new 6-month contract will be created.`)) {
+      try {
+        await Contract.renew(contract.id);
+        showSuccess(`Contract renewed. Customer ${contract.customer_name} must sign the new contract.`);
+        onRefresh();
+      } catch (error: any) {
+        showError(error?.message || "Failed to renew contract.");
+      }
+    }
+  };
+
   return (
     <>
       <Card>
@@ -220,8 +234,8 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
                         </Button>
                       )}
                       {onEdit && canModify && (
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => onEdit(contract)}
                           className="flex items-center gap-2 flex-1 sm:flex-none"
@@ -230,8 +244,30 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
                           Edit
                         </Button>
                       )}
-                      <Button 
-                        variant="outline" 
+                      {contract.status === 'expired' && canPayRebate && onPayRebate && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onPayRebate(contract)}
+                          className="flex items-center gap-2 flex-1 sm:flex-none border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-900/20"
+                        >
+                          <CreditCard className="w-4 h-4" />
+                          Pay Rebate
+                        </Button>
+                      )}
+                      {contract.status === 'expired' && canModify && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRenew(contract)}
+                          className="flex items-center gap-2 flex-1 sm:flex-none border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          Renew
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => handleViewDetails(contract)}
                         className="flex items-center gap-2 flex-1 sm:flex-none"
