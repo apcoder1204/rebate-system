@@ -798,7 +798,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
       result = await readQuery(`
         SELECT
           (SELECT COUNT(*)::int FROM contracts) AS total_contracts,
-          (SELECT COUNT(*)::int FROM contracts WHERE status IN ('active','approved')) AS active_contracts,
+          (SELECT COUNT(*)::int FROM contracts WHERE status NOT IN ('expired','cancelled','rejected')) AS active_contracts,
           (SELECT COUNT(*)::int FROM orders) AS total_orders,
           COALESCE((SELECT SUM(total_amount) FROM orders), 0)::numeric AS total_spent,
           COALESCE((SELECT SUM(rebate_amount) FROM orders WHERE rebate_status != 'paid'), 0)::numeric AS available_rebate,
