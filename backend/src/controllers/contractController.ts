@@ -94,21 +94,12 @@ export const listContracts = async (req: AuthRequest, res: Response) => {
     let paramCount = 1;
     let hasWhere = false;
     
-    // Apply role-based filtering
+    // Apply role-based filtering — customers see only their own; staff/admin/manager see all
     if (req.user!.role === 'user') {
       query += ` WHERE c.customer_id = $${paramCount}`;
       countQuery += ` WHERE c.customer_id = $${paramCount}`;
       params.push(req.user!.id);
       paramCount++;
-      hasWhere = true;
-    } else if (req.user!.role === 'staff' && req.query.include_all !== 'true') {
-      const clauses: string[] = [];
-      clauses.push(`c.status IN ('pending', 'pending_approval')`);
-      clauses.push(`c.approved_by = $${paramCount}`);
-      params.push(req.user!.id);
-      paramCount++;
-      query += ` WHERE (${clauses.join(' OR ')})`;
-      countQuery += ` WHERE (${clauses.join(' OR ')})`;
       hasWhere = true;
     }
     
@@ -602,19 +593,12 @@ export const filterContracts = async (req: AuthRequest, res: Response) => {
     let paramCount = 1;
     
     // Apply role-based filtering - IDOR protection
+    // Customers see only their own contracts; staff/admin/manager see all
     if (req.user!.role === 'user') {
       query += ` AND c.customer_id = $${paramCount}`;
       countQuery += ` AND c.customer_id = $${paramCount}`;
       params.push(req.user!.id);
       paramCount++;
-    } else if (req.user!.role === 'staff') {
-      const clauses: string[] = [];
-      clauses.push(`c.status IN ('pending', 'pending_approval')`);
-      clauses.push(`c.approved_by = $${paramCount}`);
-      params.push(req.user!.id);
-      paramCount++;
-      query += ` AND (${clauses.join(' OR ')})`;
-      countQuery += ` AND (${clauses.join(' OR ')})`;
     } else if (customer_id) {
       // Validate customer_id format for admin/manager/staff
       if (!isValidUUID(customer_id as string)) {
