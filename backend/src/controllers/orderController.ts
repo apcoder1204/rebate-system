@@ -315,6 +315,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
 };
 
 import { AuditService } from '../services/auditService';
+import { AuditFormatter } from '../services/auditFormatter';
 
 export const updateOrder = async (req: AuthRequest, res: Response) => {
   try {
@@ -327,7 +328,14 @@ export const updateOrder = async (req: AuthRequest, res: Response) => {
     }
     
     // Check if order exists and user has permission
-    const orderResult = await pool.query('SELECT customer_id, customer_status, created_by, is_locked FROM orders WHERE id = $1', [id]);
+    const orderResult = await pool.query(
+      `SELECT o.customer_id, o.customer_status, o.created_by, o.is_locked, o.order_number,
+              u.full_name AS customer_name
+       FROM orders o
+       JOIN users u ON o.customer_id = u.id
+       WHERE o.id = $1`,
+      [id]
+    );
     if (orderResult.rows.length === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
@@ -463,13 +471,16 @@ export const updateOrder = async (req: AuthRequest, res: Response) => {
           values.push(true);
           
           // Log unlock action
+          const unlockActorName = await AuditService.getUserName(req.user!.id);
+          const unlockDesc = AuditFormatter.unlockOrder(unlockActorName, existingOrder.order_number, existingOrder.customer_name);
           await AuditService.log(
             req.user!.id,
             'unlock_order',
             'order',
             id,
             { previous_locked: true },
-            req.ip
+            req.ip,
+            unlockDesc
           );
         } else if (is_locked === true) {
           // If manually locking
@@ -477,13 +488,16 @@ export const updateOrder = async (req: AuthRequest, res: Response) => {
           values.push(new Date().toISOString());
 
           // Log lock action
+          const lockActorName = await AuditService.getUserName(req.user!.id);
+          const lockDesc = AuditFormatter.lockOrder(lockActorName, existingOrder.order_number, existingOrder.customer_name);
           await AuditService.log(
             req.user!.id,
             'lock_order',
             'order',
             id,
             { previous_locked: false },
-            req.ip
+            req.ip,
+            lockDesc
           );
         }
       }

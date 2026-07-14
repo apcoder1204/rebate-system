@@ -3,6 +3,7 @@ import pool from '../db/connection';
 import { AuthRequest } from '../middleware/auth';
 import { isValidUUID, sanitizeString, sanitizeNumber, sanitizeSortBy, isValidDate, isValidContractStatus, sanitizePagination } from '../middleware/validation';
 import { AuditService } from '../services/auditService';
+import { AuditFormatter } from '../services/auditFormatter';
 
 export const listContracts = async (req: AuthRequest, res: Response) => {
   try {
@@ -757,13 +758,17 @@ export const renewContract = async (req: AuthRequest, res: Response) => {
       ]
     );
 
+    const renewActorName = await AuditService.getUserName(req.user!.id);
+    const renewCustomerName = await AuditService.getUserName(source.customer_id);
+    const renewDesc = AuditFormatter.renewContract(renewActorName, renewCustomerName, source.contract_number, result.rows[0].contract_number, newRenewalCount);
     await AuditService.log(
       req.user!.id,
       'renew_contract',
       'contract',
       result.rows[0].id,
       { source_contract_id: id, renewal_count: newRenewalCount },
-      req.ip
+      req.ip,
+      renewDesc
     );
 
     res.status(201).json(result.rows[0]);

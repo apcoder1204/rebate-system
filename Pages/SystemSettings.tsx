@@ -219,38 +219,33 @@ export default function SystemSettingsPage() {
                       <thead className="bg-slate-50 dark:bg-slate-800 text-left">
                         <tr>
                           <th className="p-3 font-medium text-slate-500 whitespace-nowrap">Date</th>
-                          <th className="p-3 font-medium text-slate-500 whitespace-nowrap">User</th>
                           <th className="p-3 font-medium text-slate-500 whitespace-nowrap">Action</th>
-                          <th className="p-3 font-medium text-slate-500 whitespace-nowrap">Entity</th>
-                          <th className="p-3 font-medium text-slate-500 whitespace-nowrap">Details</th>
+                          <th className="p-3 font-medium text-slate-500">Description</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
                         {logs.map((log) => (
                           <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                            <td className="p-3 whitespace-nowrap text-slate-600 dark:text-slate-300">
-                              {format(new Date(log.created_at), 'MMM d, HH:mm')}
-                            </td>
-                            <td className="p-3 whitespace-nowrap">
-                              <div className="font-medium text-slate-900 dark:text-slate-100">{log.user_name || 'Unknown'}</div>
-                              <div className="text-xs text-slate-500 dark:text-slate-400">{log.user_email}</div>
+                            <td className="p-3 whitespace-nowrap text-slate-500 dark:text-slate-400 text-sm">
+                              {format(new Date(log.created_at), 'MMM d, yyyy HH:mm')}
                             </td>
                             <td className="p-3 whitespace-nowrap">
                               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
                                 {log.action.replace(/_/g, ' ')}
                               </span>
                             </td>
-                            <td className="p-3 whitespace-nowrap text-slate-600 dark:text-slate-300">
-                              {log.entity_type} #{log.entity_id?.substring(0, 8)}
-                            </td>
-                            <td className="p-3 text-slate-600 dark:text-slate-300 max-w-xs truncate" title={JSON.stringify(log.details, null, 2)}>
-                              {JSON.stringify(log.details)}
+                            <td className="p-3 text-slate-700 dark:text-slate-300 text-sm">
+                              {log.description || (
+                                <span className="text-slate-400 dark:text-slate-500 italic" title={JSON.stringify(log.details, null, 2)}>
+                                  {JSON.stringify(log.details)}
+                                </span>
+                              )}
                             </td>
                           </tr>
                         ))}
                         {logs.length === 0 && (
                           <tr>
-                            <td colSpan={5} className="p-8 text-center text-slate-500 dark:text-slate-400">No audit logs found</td>
+                            <td colSpan={3} className="p-8 text-center text-slate-500 dark:text-slate-400">No audit logs found</td>
                           </tr>
                         )}
                       </tbody>

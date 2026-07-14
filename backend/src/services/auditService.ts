@@ -7,6 +7,7 @@ export interface AuditLog {
   entity_type: 'order' | 'contract' | 'user' | 'system';
   entity_id?: string;
   details?: any;
+  description?: string;
   ip_address?: string;
   created_at: string;
 }
@@ -18,19 +19,31 @@ export const AuditService = {
     entityType: 'order' | 'contract' | 'user' | 'system',
     entityId?: string,
     details?: any,
-    ipAddress?: string
+    ipAddress?: string,
+    description?: string
   ): Promise<void> {
     try {
       await pool.query(
-        `INSERT INTO audit_logs 
-         (user_id, action, entity_type, entity_id, details, ip_address)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [userId, action, entityType, entityId, details ? JSON.stringify(details) : null, ipAddress]
+        `INSERT INTO audit_logs
+         (user_id, action, entity_type, entity_id, details, ip_address, description)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [userId, action, entityType, entityId, details ? JSON.stringify(details) : null, ipAddress, description ?? null]
       );
     } catch (error) {
       console.error('Failed to create audit log:', error);
-      // Fail silently to not disrupt the main flow
     }
+  },
+
+  async getUserName(userId: string): Promise<string> {
+    try {
+      const result = await pool.query('SELECT full_name, email FROM users WHERE id = $1', [userId]);
+      if (result.rows.length > 0) {
+        return result.rows[0].full_name || result.rows[0].email || 'Unknown';
+      }
+    } catch {
+      // fall through
+    }
+    return 'Unknown';
   },
 
   async getLogs(limit: number = 100, offset: number = 0, entityType?: string): Promise<any[]> {
@@ -39,19 +52,18 @@ export const AuditService = {
       FROM audit_logs al
       LEFT JOIN users u ON al.user_id = u.id
     `;
-    
+
     const params: any[] = [];
-    
+
     if (entityType) {
       query += ` WHERE al.entity_type = $1`;
       params.push(entityType);
     }
-    
+
     query += ` ORDER BY al.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(limit, offset);
-    
+
     const result = await pool.query(query, params);
     return result.rows;
   }
 };
-

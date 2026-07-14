@@ -3,6 +3,7 @@ import pool, { writeQuery } from '../db/connection';
 import { AuthRequest } from '../middleware/auth';
 import { isValidUUID } from '../middleware/validation';
 import { AuditService } from '../services/auditService';
+import { AuditFormatter } from '../services/auditFormatter';
 import { SystemSettings } from '../services/systemSettings';
 
 export const getRebateCalculation = async (req: AuthRequest, res: Response) => {
@@ -155,6 +156,10 @@ export const payRebate = async (req: AuthRequest, res: Response) => {
       }
     }
 
+    const payActorName = await AuditService.getUserName(req.user!.id);
+    const payCustomerId = String([...customerIds][0]);
+    const payCustomerName = await AuditService.getUserName(payCustomerId);
+    const payDesc = AuditFormatter.payRebate(payActorName, payCustomerName, totalPaid, order_ids.length, notes);
     await AuditService.log(
       req.user!.id,
       'pay_rebate',
@@ -163,11 +168,12 @@ export const payRebate = async (req: AuthRequest, res: Response) => {
       {
         order_ids,
         total_paid: totalPaid,
-        customer_id: [...customerIds][0],
+        customer_id: payCustomerId,
         notes,
         expired_contract_ids: expiredContractIds,
       },
-      req.ip
+      req.ip,
+      payDesc
     );
 
     res.json({
@@ -212,7 +218,7 @@ export const requestRebate = async (req: AuthRequest, res: Response) => {
 
     // Verify contract belongs to this customer and is active or expired
     const contractResult = await pool.query(
-      `SELECT id, customer_id, status FROM contracts WHERE id = $1`,
+      `SELECT id, customer_id, status, contract_number FROM contracts WHERE id = $1`,
       [contract_id]
     );
     if (contractResult.rows.length === 0) {
@@ -255,9 +261,11 @@ export const requestRebate = async (req: AuthRequest, res: Response) => {
       [customerId, contract_id, totalRebateAmount, customer_notes || null]
     );
 
+    const reqCustomerName = await AuditService.getUserName(customerId);
+    const reqDesc = AuditFormatter.requestRebate(reqCustomerName, contract.contract_number, totalRebateAmount);
     await AuditService.log(customerId, 'request_rebate', 'contract', contract_id, {
       total_rebate_amount: totalRebateAmount,
-    }, req.ip);
+    }, req.ip, reqDesc);
 
     res.status(201).json(requestResult.rows[0]);
   } catch (error) {
@@ -338,7 +346,7 @@ export const approveRebateRequest = async (req: AuthRequest, res: Response) => {
 
     // Load the request
     const reqResult = await pool.query(
-      `SELECT rr.*, c.customer_id as contract_customer_id
+      `SELECT rr.*, c.customer_id as contract_customer_id, c.contract_number
        FROM rebate_requests rr
        JOIN contracts c ON rr.contract_id = c.id
        WHERE rr.id = $1`,
@@ -377,11 +385,14 @@ export const approveRebateRequest = async (req: AuthRequest, res: Response) => {
       [req.user!.id, staff_notes || null, id]
     );
 
+    const approveActorName = await AuditService.getUserName(req.user!.id);
+    const approveCustomerName = await AuditService.getUserName(rebateReq.customer_id);
+    const approveDesc = AuditFormatter.approveRebate(approveActorName, approveCustomerName, rebateReq.contract_number, rebateReq.total_rebate_amount);
     await AuditService.log(req.user!.id, 'approve_rebate', 'contract', rebateReq.contract_id, {
       request_id: id,
       customer_id: rebateReq.customer_id,
       total_rebate_amount: rebateReq.total_rebate_amount,
-    }, req.ip);
+    }, req.ip, approveDesc);
 
     res.json({ message: 'Rebate approved and paid. Contract has been expired.' });
   } catch (error) {
@@ -401,13 +412,18 @@ export const rejectRebateRequest = async (req: AuthRequest, res: Response) => {
     }
 
     const reqResult = await pool.query(
-      `SELECT id, status FROM rebate_requests WHERE id = $1`, [id]
+      `SELECT rr.id, rr.status, rr.customer_id, rr.total_rebate_amount, rr.contract_id, c.contract_number
+       FROM rebate_requests rr
+       JOIN contracts c ON rr.contract_id = c.id
+       WHERE rr.id = $1`,
+      [id]
     );
     if (reqResult.rows.length === 0) {
       return res.status(404).json({ error: 'Rebate request not found' });
     }
-    if (reqResult.rows[0].status !== 'pending') {
-      return res.status(400).json({ error: `Request is already ${reqResult.rows[0].status}` });
+    const rejectReq = reqResult.rows[0];
+    if (rejectReq.status !== 'pending') {
+      return res.status(400).json({ error: `Request is already ${rejectReq.status}` });
     }
 
     await writeQuery(
@@ -416,6 +432,16 @@ export const rejectRebateRequest = async (req: AuthRequest, res: Response) => {
        WHERE id = $3`,
       [req.user!.id, staff_notes || null, id]
     );
+
+    const rejectActorName = await AuditService.getUserName(req.user!.id);
+    const rejectCustomerName = await AuditService.getUserName(rejectReq.customer_id);
+    const rejectDesc = AuditFormatter.rejectRebate(rejectActorName, rejectCustomerName, rejectReq.contract_number, rejectReq.total_rebate_amount, staff_notes || null);
+    await AuditService.log(req.user!.id, 'reject_rebate', 'contract', rejectReq.contract_id, {
+      request_id: id,
+      customer_id: rejectReq.customer_id,
+      total_rebate_amount: rejectReq.total_rebate_amount,
+      staff_notes: staff_notes || null,
+    }, req.ip, rejectDesc);
 
     res.json({ message: 'Rebate request rejected.' });
   } catch (error) {

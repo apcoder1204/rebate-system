@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { SystemSettings } from '../services/systemSettings';
 import { AuditService } from '../services/auditService';
+import { AuditFormatter } from '../services/auditFormatter';
 import { CacheService } from '../services/cacheService';
 import { sendOrderReminders } from '../services/orderReminderService';
 import pool from '../db/connection';
@@ -40,13 +41,16 @@ export const updateSetting = async (req: AuthRequest, res: Response) => {
     const setting = await SystemSettings.update(key, String(value), req.user!.id);
     
     // Log action
+    const actorName = await AuditService.getUserName(req.user!.id);
+    const description = AuditFormatter.updateSetting(actorName, key, oldValue, String(value));
     await AuditService.log(
       req.user!.id,
       'update_setting',
       'system',
       setting.id,
       { key, old_value: oldValue, new_value: value },
-      req.ip
+      req.ip,
+      description
     );
 
     res.json(setting);
@@ -101,7 +105,7 @@ export const toggleUserActive = async (req: AuthRequest, res: Response) => {
     }
 
     // Get current status and role for validation/audit
-    const userResult = await pool.query('SELECT role, is_active FROM users WHERE id = $1', [id]);
+    const userResult = await pool.query('SELECT role, is_active, full_name, email FROM users WHERE id = $1', [id]);
     if (userResult.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -127,13 +131,18 @@ export const toggleUserActive = async (req: AuthRequest, res: Response) => {
     await CacheService.del(`auth:user:${id}`);
 
     // Log action
+    const adminName = await AuditService.getUserName(req.user!.id);
+    const userDesc = is_active
+      ? AuditFormatter.activateUser(adminName, targetUser.full_name, targetUser.email)
+      : AuditFormatter.deactivateUser(adminName, targetUser.full_name, targetUser.email);
     await AuditService.log(
       req.user!.id,
       is_active ? 'activate_user' : 'deactivate_user',
       'user',
       id,
       { previous_status: targetUser.is_active },
-      req.ip
+      req.ip,
+      userDesc
     );
 
     res.json({ 
@@ -158,13 +167,16 @@ export const triggerOrderReminders = async (req: AuthRequest, res: Response) => 
     const result = await sendOrderReminders();
 
     // Log action
+    const reminderActorName = await AuditService.getUserName(req.user!.id);
+    const reminderDesc = AuditFormatter.triggerOrderReminders(reminderActorName, result.emailsSent, result.errors);
     await AuditService.log(
       req.user!.id,
       'trigger_order_reminders',
       'system',
       undefined,
       { emails_sent: result.emailsSent, errors: result.errors },
-      req.ip
+      req.ip,
+      reminderDesc
     );
 
     res.json(result);
