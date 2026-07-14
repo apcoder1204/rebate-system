@@ -221,27 +221,37 @@ export const getContract = async (req: AuthRequest, res: Response) => {
 
 export const createContract = async (req: AuthRequest, res: Response) => {
   try {
-    const { customer_id, start_date, end_date, rebate_percentage, status, signed_contract_url, customer_signature_data_url } = req.body;
-    
-    if (!customer_id || !start_date || !end_date) {
-      return res.status(400).json({ error: 'Customer ID, start date, and end date are required' });
+    const { customer_id, start_date, rebate_percentage, status, signed_contract_url, customer_signature_data_url } = req.body;
+
+    if (!customer_id || !start_date) {
+      return res.status(400).json({ error: 'Customer ID and start date are required' });
     }
-    
+
     // Validate customer_id format
     if (!isValidUUID(customer_id)) {
       return res.status(400).json({ error: 'Invalid customer ID format' });
     }
-    
-    // Validate dates
-    if (!isValidDate(start_date) || !isValidDate(end_date)) {
+
+    // Validate start date
+    if (!isValidDate(start_date)) {
       return res.status(400).json({ error: 'Invalid date format. Use ISO 8601 format' });
     }
-    
-    // Validate date logic
+
+    // Always use the fixed cycle end date — never trust client-provided end_date
+    const cycleSettingResult = await pool.query(
+      `SELECT value FROM system_settings WHERE key = 'cycle_end_date'`
+    );
+    if (cycleSettingResult.rows.length === 0) {
+      return res.status(500).json({ error: 'cycle_end_date is not configured in system settings' });
+    }
+    const end_date = cycleSettingResult.rows[0].value as string;
+
     const start = new Date(start_date);
     const end = new Date(end_date);
     if (end <= start) {
-      return res.status(400).json({ error: 'End date must be after start date' });
+      return res.status(400).json({
+        error: `Start date must be before the program cycle end date (${end_date}). Please update the cycle_end_date setting if the cycle has been extended.`,
+      });
     }
     
     // Validate rebate_percentage if provided

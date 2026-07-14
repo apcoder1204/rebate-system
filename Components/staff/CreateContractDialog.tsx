@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Contract } from "@/entities/Contract";
+import { Admin } from "@/entities/Admin";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,7 @@ export default function CreateContractDialog({ open, onClose, onSuccess, custome
     rebate_percentage: "1.00",
     status: "pending",
   });
+  const [cycleEndDate, setCycleEndDate] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -34,6 +36,15 @@ export default function CreateContractDialog({ open, onClose, onSuccess, custome
 
   useEffect(() => {
     if (open) {
+      // Always fetch the current cycle end date
+      Admin.getSetting('cycle_end_date').then((val) => {
+        const end = val || '';
+        setCycleEndDate(end);
+        if (!editingContract) {
+          setFormData(prev => ({ ...prev, end_date: end }));
+        }
+      }).catch(() => {});
+
       if (editingContract) {
         setFormData({
           customer_id: editingContract.customer_id || "",
@@ -43,11 +54,10 @@ export default function CreateContractDialog({ open, onClose, onSuccess, custome
           status: editingContract.status || "pending",
         });
       } else {
-        // Reset form for new contract
         setFormData({
           customer_id: "",
           start_date: "",
-          end_date: "",
+          end_date: cycleEndDate,
           rebate_percentage: "1.00",
           status: "pending",
         });
@@ -56,7 +66,6 @@ export default function CreateContractDialog({ open, onClose, onSuccess, custome
       setShowPreview(false);
       setIsStatusEditing(false);
     } else {
-      // Reset when dialog closes
       setFormData({
         customer_id: "",
         start_date: "",
@@ -82,13 +91,9 @@ export default function CreateContractDialog({ open, onClose, onSuccess, custome
       newErrors.start_date = "Start date is required";
     }
 
-    if (!formData.end_date) {
-      newErrors.end_date = "End date is required";
-    }
-
     if (formData.start_date && formData.end_date) {
       if (new Date(formData.end_date) <= new Date(formData.start_date)) {
-        newErrors.end_date = "End date must be after start date";
+        newErrors.start_date = `Start date must be before the cycle end date (${formData.end_date})`;
       }
     }
 
@@ -279,16 +284,15 @@ export default function CreateContractDialog({ open, onClose, onSuccess, custome
               </div>
               
               <div>
-                <Label htmlFor="end_date">End Date *</Label>
+                <Label htmlFor="end_date">End Date</Label>
                 <Input
                   id="end_date"
                   name="end_date"
                   type="date"
                   value={formData.end_date}
-                  onChange={handleInputChange}
-                  min={formData.start_date || undefined}
-                  className={`mt-1 ${errors.end_date ? 'border-red-500' : ''}`}
-                  required
+                  onChange={editingContract ? handleInputChange : undefined}
+                  disabled={!editingContract}
+                  className={`mt-1 ${!editingContract ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''} ${errors.end_date ? 'border-red-500' : ''}`}
                 />
                 {errors.end_date && (
                   <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
@@ -296,12 +300,14 @@ export default function CreateContractDialog({ open, onClose, onSuccess, custome
                     {errors.end_date}
                   </p>
                 )}
-                {duration && !errors.end_date && (
+                {!editingContract ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Fixed program cycle end date</p>
+                ) : duration && !errors.end_date ? (
                   <p className="text-sm text-green-600 mt-1 flex items-center gap-1">
                     <CheckCircle className="w-4 h-4" />
                     Duration: {duration.display}
                   </p>
-                )}
+                ) : null}
               </div>
             </div>
 
