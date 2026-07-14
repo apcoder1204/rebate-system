@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/Components/ui/card";
 import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
 import { Badge } from "@/Components/ui/badge";
-import { Search, FileText, Calendar, User, Mail, Eye, Edit, Percent, Trash2, CheckCircle, RefreshCw, CreditCard } from "lucide-react";
+import { Search, FileText, Calendar, User, Mail, Eye, Edit, Percent, Trash2, CheckCircle, RefreshCw, CreditCard, BadgeCheck } from "lucide-react";
 import { format } from "date-fns";
 import { ContractPreviewDialog, ManagerApprovalDialog } from "@/Components/contracts";
 import { User as UserEntity } from "@/entities/User";
@@ -290,7 +290,13 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
                           Edit
                         </Button>
                       )}
-                      {contract.status === 'expired' && canPayRebate && onPayRebate && (
+                      {contract.status === 'expired' && contract.rebate_fully_paid && (
+                        <span className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700">
+                          <BadgeCheck className="w-4 h-4" />
+                          Rebate Paid
+                        </span>
+                      )}
+                      {contract.status === 'expired' && !contract.rebate_fully_paid && canPayRebate && onPayRebate && (
                         <Button
                           variant="outline"
                           size="sm"

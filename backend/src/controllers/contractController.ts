@@ -54,7 +54,15 @@ export const listContracts = async (req: AuthRequest, res: Response) => {
       c.*,
       u.full_name as customer_name,
       u.email as customer_email,
-      u.phone as customer_phone
+      u.phone as customer_phone,
+      (
+        SELECT CASE
+          WHEN COUNT(*) = 0 THEN false
+          WHEN COUNT(*) FILTER (WHERE rebate_status = 'unpaid') = 0 THEN true
+          ELSE false
+        END
+        FROM orders WHERE contract_id = c.id
+      ) as rebate_fully_paid
     `;
     if (hasApprovedByColumn) {
       selectFields += `,
@@ -561,7 +569,15 @@ export const filterContracts = async (req: AuthRequest, res: Response) => {
       c.*,
       u.full_name as customer_name,
       u.email as customer_email,
-      u.phone as customer_phone
+      u.phone as customer_phone,
+      (
+        SELECT CASE
+          WHEN COUNT(*) = 0 THEN false
+          WHEN COUNT(*) FILTER (WHERE rebate_status = 'unpaid') = 0 THEN true
+          ELSE false
+        END
+        FROM orders WHERE contract_id = c.id
+      ) as rebate_fully_paid
     `;
     if (hasApprovedByColumn) {
       selectFields += `,
