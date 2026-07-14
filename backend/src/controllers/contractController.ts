@@ -731,30 +731,48 @@ export const renewContract = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'A renewal for this contract already exists' });
     }
 
-    // New contract: start today, end 6 months from today
+    // Fetch fixed cycle end date from system_settings
+    const cycleSettingResult = await pool.query(
+      `SELECT value FROM system_settings WHERE key = 'cycle_end_date'`
+    );
+    if (cycleSettingResult.rows.length === 0) {
+      return res.status(500).json({ error: 'cycle_end_date is not configured in system settings' });
+    }
+    const cycleEndDateStr = cycleSettingResult.rows[0].value as string;
     const today = new Date();
-    const endDate = new Date(today);
-    endDate.setMonth(endDate.getMonth() + 6);
-    const startDateStr = today.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T')[0];
+    const todayStr = today.toISOString().split('T')[0];
+    if (cycleEndDateStr <= todayStr) {
+      return res.status(400).json({
+        error: `The program cycle ended on ${cycleEndDateStr}. Please update the cycle_end_date setting before creating new contracts.`,
+      });
+    }
 
+    const startDateStr = todayStr;
     const newRenewalCount = (source.renewal_count || 0) + 1;
     const contractNumber = `CNT-${Date.now()}`;
 
+    // Copy all signature data from source contract so no re-signing is required
     const result = await pool.query(
       `INSERT INTO contracts
          (customer_id, contract_number, start_date, end_date, rebate_percentage,
-          status, renewed_from_id, renewal_count)
-       VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7)
+          status, renewed_from_id, renewal_count,
+          signed_contract_url, customer_signature_data_url,
+          manager_signature_data_url, manager_name, manager_position)
+       VALUES ($1, $2, $3, $4, $5, 'pending_approval', $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         source.customer_id,
         contractNumber,
         startDateStr,
-        endDateStr,
+        cycleEndDateStr,
         source.rebate_percentage,
         id,
         newRenewalCount,
+        source.signed_contract_url || null,
+        source.customer_signature_data_url || null,
+        source.manager_signature_data_url || null,
+        source.manager_name || null,
+        source.manager_position || null,
       ]
     );
 
@@ -774,6 +792,92 @@ export const renewContract = async (req: AuthRequest, res: Response) => {
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Renew contract error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const approveRenewal = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!isValidUUID(id)) {
+      return res.status(400).json({ error: 'Invalid contract ID format' });
+    }
+
+    const contractResult = await pool.query(
+      `SELECT c.*, u.full_name AS customer_name
+       FROM contracts c
+       JOIN users u ON c.customer_id = u.id
+       WHERE c.id = $1`,
+      [id]
+    );
+    if (contractResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Contract not found' });
+    }
+    const contract = contractResult.rows[0];
+
+    if (contract.status !== 'pending_approval') {
+      return res.status(400).json({ error: 'Contract is not pending approval' });
+    }
+    if (!contract.renewed_from_id) {
+      return res.status(400).json({ error: 'This is not a renewal contract. Use the standard approval flow.' });
+    }
+
+    const updateResult = await pool.query(
+      `UPDATE contracts
+       SET status = 'active', approved_by = $1, approved_date = NOW()
+       WHERE id = $2
+       RETURNING *`,
+      [req.user!.id, id]
+    );
+
+    const actorName = await AuditService.getUserName(req.user!.id);
+    const desc = AuditFormatter.approveRenewal(actorName, contract.customer_name, contract.contract_number);
+    await AuditService.log(
+      req.user!.id,
+      'approve_renewal',
+      'contract',
+      id,
+      { renewed_from_id: contract.renewed_from_id },
+      req.ip,
+      desc
+    );
+
+    res.json(updateResult.rows[0]);
+  } catch (error) {
+    console.error('Approve renewal error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const bulkExpireContracts = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!['admin', 'manager'].includes(req.user!.role)) {
+      return res.status(403).json({ error: 'Only admins and managers can bulk expire contracts' });
+    }
+
+    const result = await pool.query(
+      `UPDATE contracts
+       SET status = 'expired'
+       WHERE status IN ('active', 'approved')
+       RETURNING id`
+    );
+
+    const count = result.rowCount || 0;
+    const actorName = await AuditService.getUserName(req.user!.id);
+    const desc = AuditFormatter.bulkExpireContracts(actorName, count);
+    await AuditService.log(
+      req.user!.id,
+      'bulk_expire_contracts',
+      'system',
+      undefined,
+      { expired_count: count },
+      req.ip,
+      desc
+    );
+
+    res.json({ expired_count: count, message: `${count} contract(s) set to expired.` });
+  } catch (error) {
+    console.error('Bulk expire contracts error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

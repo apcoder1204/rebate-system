@@ -54,4 +54,12 @@ export const AuditFormatter = {
   renewContract(actorName: string, customerName: string, sourceContractNumber: string, newContractNumber: string, renewalCount: number): string {
     return `${actorName} renewed contract ${sourceContractNumber} for customer ${customerName} — new contract ${newContractNumber} created (renewal #${renewalCount}).`;
   },
+
+  approveRenewal(actorName: string, customerName: string, contractNumber: string): string {
+    return `${actorName} approved the renewal of contract ${contractNumber} for customer ${customerName} — contract is now active.`;
+  },
+
+  bulkExpireContracts(actorName: string, count: number): string {
+    return `${actorName} manually ended the program cycle — ${count} active contract(s) set to expired.`;
+  },
 };

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Contract, ContractFilters } from "@/entities/Contract";
 import { User } from "@/entities/User";
 import { Button } from "@/Components/ui/button";
-import { Plus, Download } from "lucide-react";
+import { Plus, Download, PowerOff } from "lucide-react";
 import { createPageUrl } from "@/utils";
 import { useNavigate } from "react-router-dom";
 import { Pagination } from "@/Components/ui/pagination";
@@ -108,28 +108,57 @@ export default function ManageContracts() {
             <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-100 mb-2">Manage Contracts</h1>
             <p className="text-slate-600 dark:text-slate-400">Oversee all customer rebate contracts</p>
           </div>
-          <Button 
-            variant="outline" 
-            onClick={async () => {
-              try {
-                const blob = await Contract.exportCSV();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `contracts_${new Date().toISOString().split('T')[0]}.csv`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-              } catch (error) {
-                console.error('Export failed:', error);
-                alert('Failed to export contracts. Please try again.');
-              }
-            }}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Export CSV
-          </Button>
+          <div className="flex items-center gap-3 flex-wrap">
+            {['admin', 'manager'].includes(currentUserRole || '') && (
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  const activeCount = contracts.filter(c => ['active', 'approved'].includes(c.status)).length;
+                  if (activeCount === 0) {
+                    alert('No active contracts to expire.');
+                    return;
+                  }
+                  if (window.confirm(`END PROGRAM CYCLE\n\nThis will immediately expire all ${activeCount} active contract(s). This action cannot be undone.\n\nAre you sure you want to end the cycle now?`)) {
+                    try {
+                      const result = await Contract.bulkExpire();
+                      alert(result.message);
+                      setPage(1);
+                      loadContracts(1, pageSize);
+                    } catch (error) {
+                      console.error('Bulk expire failed:', error);
+                      alert('Failed to end cycle. Please try again.');
+                    }
+                  }
+                }}
+                className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+              >
+                <PowerOff className="w-4 h-4 mr-2" />
+                End Cycle
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  const blob = await Contract.exportCSV();
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `contracts_${new Date().toISOString().split('T')[0]}.csv`;
+                  document.body.appendChild(a);
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                  document.body.removeChild(a);
+                } catch (error) {
+                  console.error('Export failed:', error);
+                  alert('Failed to export contracts. Please try again.');
+                }
+              }}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export CSV
+            </Button>
+          </div>
         </div>
 
         <ContractsList

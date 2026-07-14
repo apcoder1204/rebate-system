@@ -136,6 +136,12 @@ export const Contract = {
   async renew(id: string): Promise<ContractType> {
     return apiRequest(`/contracts/${id}/renew`, { method: 'POST' });
   },
+  async approveRenewal(id: string): Promise<ContractType> {
+    return apiRequest(`/contracts/${id}/approve-renewal`, { method: 'POST' });
+  },
+  async bulkExpire(): Promise<{ expired_count: number; message: string }> {
+    return apiRequest('/contracts/bulk-expire', { method: 'POST' });
+  },
   async exportCSV(filters?: ContractFilters): Promise<Blob> {
     const params = new URLSearchParams();
     if (filters?.customer_id) params.append('customer_id', filters.customer_id);

@@ -7,6 +7,7 @@ import cron from 'node-cron';
 import routes from './routes';
 import { securityHeaders, apiRateLimit } from './middleware/security';
 import { sendOrderReminders } from './services/orderReminderService';
+import pool from './db/connection';
 
 dotenv.config();
 
@@ -135,5 +136,26 @@ app.listen(PORT, () => {
   });
   
   console.log('📧 Order reminder scheduler initialized (runs every Sunday at 9:00 AM)');
+
+  // Daily job: auto-expire contracts whose end_date has passed
+  cron.schedule('0 0 * * *', async () => {
+    console.log('📋 Running daily contract expiry check...');
+    try {
+      const result = await pool.query(
+        `UPDATE contracts SET status = 'expired'
+         WHERE end_date < CURRENT_DATE AND status IN ('active', 'approved')`
+      );
+      if ((result.rowCount || 0) > 0) {
+        console.log(`📋 Auto-expired ${result.rowCount} contract(s) past their end date.`);
+      }
+    } catch (error) {
+      console.error('❌ Error in daily contract expiry job:', error);
+    }
+  }, {
+    scheduled: true,
+    timezone: "Africa/Dar_es_Salaam"
+  });
+
+  console.log('📋 Daily contract expiry scheduler initialized (runs at midnight)');
 });
 

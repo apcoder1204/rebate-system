@@ -133,13 +133,25 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
   };
 
   const handleRenew = async (contract: any) => {
-    if (window.confirm(`Renew contract ${contract.contract_number} for ${contract.customer_name}? A new 6-month contract will be created.`)) {
+    if (window.confirm(`Renew contract ${contract.contract_number} for ${contract.customer_name}?\n\nA new contract will be created carrying forward all signatures. It will be valid until the program cycle end date (December 31, 2026). You can then approve it with one click.`)) {
       try {
         await Contract.renew(contract.id);
-        showSuccess(`Contract renewed. Customer ${contract.customer_name} must sign the new contract.`);
+        showSuccess(`Renewal created for ${contract.customer_name}. Use "Approve Renewal" to activate it.`);
         onRefresh();
       } catch (error: any) {
         showError(error?.message || "Failed to renew contract.");
+      }
+    }
+  };
+
+  const handleApproveRenewal = async (contract: any) => {
+    if (window.confirm(`Approve renewal contract ${contract.contract_number} for ${contract.customer_name}?\n\nThis will activate the contract immediately. No new signature is required.`)) {
+      try {
+        await Contract.approveRenewal(contract.id);
+        showSuccess(`Renewal contract ${contract.contract_number} is now active.`);
+        onRefresh();
+      } catch (error: any) {
+        showError(error?.message || "Failed to approve renewal.");
       }
     }
   };
@@ -222,15 +234,26 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                      {contract.status === 'pending_approval' && canApprove && (
-                        <Button 
-                          variant="default" 
+                      {contract.status === 'pending_approval' && !contract.renewed_from_id && canApprove && (
+                        <Button
+                          variant="default"
                           size="sm"
                           onClick={() => handleApprove(contract)}
                           className="flex items-center gap-2 bg-green-600 hover:bg-green-700 flex-1 sm:flex-none"
                         >
                           <CheckCircle className="w-4 h-4" />
                           Approve
+                        </Button>
+                      )}
+                      {contract.status === 'pending_approval' && contract.renewed_from_id && canApprove && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleApproveRenewal(contract)}
+                          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 flex-1 sm:flex-none"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          Approve Renewal
                         </Button>
                       )}
                       {onEdit && canModify && (

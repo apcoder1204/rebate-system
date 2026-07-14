@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { User } from "@/entities/User";
 import { Contract } from "@/entities/Contract";
+import { Admin } from "@/entities/Admin";
 import { Card, CardContent } from "@/Components/ui/card";
 import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
@@ -25,6 +26,7 @@ export default function MyContracts() {
 
   // New contract form state
   const [formData, setFormData] = useState({ start_date: "", end_date: "" });
+  const [cycleEndDate, setCycleEndDate] = useState<string>("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
@@ -39,8 +41,14 @@ export default function MyContracts() {
         return;
       }
       setUser(currentUser);
-      const resp = await Contract.filter({ customer_id: currentUser.id }, '-created_date');
-      setContracts(Array.isArray(resp?.data) ? resp.data : []);
+      const [contractResp, endDate] = await Promise.all([
+        Contract.filter({ customer_id: currentUser.id }, '-created_date'),
+        Admin.getSetting('cycle_end_date'),
+      ]);
+      setContracts(Array.isArray(contractResp?.data) ? contractResp.data : []);
+      const end = endDate || '';
+      setCycleEndDate(end);
+      setFormData(prev => ({ ...prev, end_date: end }));
     } catch (error: any) {
       console.error("Error loading contracts:", error);
       setLoadError(error?.message || "Failed to load contracts. Please try again.");
@@ -49,15 +57,6 @@ export default function MyContracts() {
   }, [navigate]);
 
   useEffect(() => { loadData(); }, [loadData]);
-
-  // Auto-calculate 6-month end date from start date
-  useEffect(() => {
-    if (formData.start_date) {
-      const end = new Date(formData.start_date);
-      end.setMonth(end.getMonth() + 6);
-      setFormData(prev => ({ ...prev, end_date: end.toISOString().split('T')[0] }));
-    }
-  }, [formData.start_date]);
 
   // Show the new-contract form only when no active/pending contract exists
   const hasActiveOrPending = contracts.some(c =>
@@ -206,7 +205,7 @@ export default function MyContracts() {
                     className="mt-1 w-5 h-5 text-blue-600 dark:text-blue-400 border-slate-300 dark:border-slate-600 rounded focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-slate-700"
                   />
                   <label htmlFor="agreeTerms" className="text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
-                    I have read and agree to the terms and conditions. This contract will last for exactly 6 months from the start date.
+                    I have read and agree to the terms and conditions. This contract will run until the end of the current program cycle ({cycleEndDate || 'December 31, 2026'}).
                   </label>
                 </div>
 
@@ -221,13 +220,13 @@ export default function MyContracts() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="end_date">End Date *</Label>
+                      <Label htmlFor="end_date">End Date</Label>
                       <Input
                         id="end_date" name="end_date" type="date"
                         value={formData.end_date} disabled
                         className="mt-1 bg-slate-100 dark:bg-slate-700"
                       />
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Automatically set to 6 months from start date</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Fixed program cycle end date</p>
                     </div>
                   </div>
                 )}
