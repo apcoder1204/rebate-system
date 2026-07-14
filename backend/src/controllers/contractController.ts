@@ -815,7 +815,7 @@ export const approveRenewal = async (req: AuthRequest, res: Response) => {
     }
     const contract = contractResult.rows[0];
 
-    if (contract.status !== 'pending_approval') {
+    if (!['pending', 'pending_approval'].includes(contract.status)) {
       return res.status(400).json({ error: 'Contract is not pending approval' });
     }
     if (!contract.renewed_from_id) {
