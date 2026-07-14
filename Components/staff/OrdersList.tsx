@@ -18,10 +18,16 @@ interface OrdersListProps {
   currentUserId?: string;
 }
 
+const CURRENT_CONTRACT_STATUSES = ['active', 'approved', 'pending_approval', 'pending'];
+
 export default function OrdersList({ orders, onRefresh, onEdit, canEdit, currentUserRole, currentUserId }: OrdersListProps) {
   const { showSuccess, showError, showWarning } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const [tab, setTab] = useState<'current' | 'previous' | 'all'>('current');
   const safeOrders = Array.isArray(orders) ? orders : [];
+
+  const currentCount = safeOrders.filter(o => CURRENT_CONTRACT_STATUSES.includes(o.contract_status)).length;
+  const previousCount = safeOrders.filter(o => o.contract_status === 'expired').length;
 
   const handleDownload = (order: any) => {
     const doc = new jsPDF();
@@ -70,10 +76,18 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
     doc.save(filename);
   };
 
-  const filteredOrders = safeOrders.filter((order: any) =>
-    order.order_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    order.customer_id?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredOrders = safeOrders.filter((order: any) => {
+    const matchesTab =
+      tab === 'all' ||
+      (tab === 'current' && CURRENT_CONTRACT_STATUSES.includes(order.contract_status)) ||
+      (tab === 'previous' && order.contract_status === 'expired');
+    const q = searchQuery.toLowerCase();
+    const matchesSearch =
+      !q ||
+      order.order_number?.toLowerCase().includes(q) ||
+      order.customer_id?.toLowerCase().includes(q);
+    return matchesTab && matchesSearch;
+  });
 
   const handleDelete = async (orderId: string) => {
     if (currentUserRole !== 'admin') {
@@ -151,26 +165,51 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
     return 0;
   });
 
+  const TabBtn = ({ value, label, count }: { value: typeof tab; label: string; count: number }) => (
+    <button
+      onClick={() => setTab(value)}
+      className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+        tab === value
+          ? 'bg-purple-600 text-white'
+          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+      }`}
+    >
+      {label}
+      <span className={`ml-2 px-1.5 py-0.5 text-xs rounded-full ${
+        tab === value ? 'bg-purple-500 text-white' : 'bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300'
+      }`}>
+        {count}
+      </span>
+    </button>
+  );
+
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <CardTitle>All Orders</CardTitle>
-          <div className="relative w-full md:w-64">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-            <Input
-              placeholder="Search orders..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <CardTitle>Orders</CardTitle>
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <Input
+                placeholder="Search orders..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg w-fit">
+            <TabBtn value="current" label="Current Cycle" count={currentCount} />
+            <TabBtn value="previous" label="Previous Cycle" count={previousCount} />
+            <TabBtn value="all" label="All" count={safeOrders.length} />
           </div>
         </div>
       </CardHeader>
       <CardContent>
         {filteredOrders.length === 0 ? (
           <div className="text-center py-8 text-slate-500 dark:text-slate-400">
-            No orders found
+            No {tab === 'current' ? 'current cycle' : tab === 'previous' ? 'previous cycle' : ''} orders found
           </div>
         ) : (
           <div className="space-y-4">

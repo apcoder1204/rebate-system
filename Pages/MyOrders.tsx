@@ -33,6 +33,7 @@ export default function MyOrders() {
   const [grandTotalAmount, setGrandTotalAmount] = useState(0);
   const [grandTotalRebate, setGrandTotalRebate] = useState(0);
   const [unpaidEligibleRebate, setUnpaidEligibleRebate] = useState(0);
+  const [cycleTab, setCycleTab] = useState<'current' | 'previous' | 'all'>('current');
   const navigate = useNavigate();
 
   const loadData = useCallback(async (page = 1) => {
@@ -73,20 +74,29 @@ export default function MyOrders() {
     loadData(1);
   }, [loadData]);
 
-  // Client-side filter on the current page only (search + status)
+  const CURRENT_CONTRACT_STATUSES = ['active', 'approved', 'pending_approval', 'pending'];
+
+  const currentCycleCount = orders.filter(o => CURRENT_CONTRACT_STATUSES.includes(o.contract_status)).length;
+  const previousCycleCount = orders.filter(o => o.contract_status === 'expired').length;
+
+  // Client-side filter on the current page only (search + status + cycle tab)
   const filteredOrders = orders.filter((order) => {
+    const matchesTab =
+      cycleTab === 'all' ||
+      (cycleTab === 'current' && CURRENT_CONTRACT_STATUSES.includes(order.contract_status)) ||
+      (cycleTab === 'previous' && order.contract_status === 'expired');
+
     const matchesSearch = !searchQuery ||
       order.order_number?.toLowerCase().includes(searchQuery.toLowerCase());
 
     let matchesStatus = true;
     if (filterStatus === "eligible") {
-      // Orders under expired contracts with unpaid rebate
       matchesStatus = order.contract_status === 'expired' && order.rebate_status !== 'paid';
     } else if (filterStatus === "pending") {
       matchesStatus = order.customer_status === 'pending';
     }
 
-    return matchesSearch && matchesStatus;
+    return matchesTab && matchesSearch && matchesStatus;
   });
 
   const handlePageChange = (newPage: number) => {
@@ -170,6 +180,32 @@ export default function MyOrders() {
               <p className="text-3xl font-bold">Tsh {grandTotalRebate.toFixed(2)}</p>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Cycle tabs */}
+        <div className="flex items-center gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg w-fit">
+          {([
+            { value: 'current', label: 'Current Cycle', count: currentCycleCount },
+            { value: 'previous', label: 'Previous Cycle', count: previousCycleCount },
+            { value: 'all', label: 'All', count: orders.length },
+          ] as const).map(({ value, label, count }) => (
+            <button
+              key={value}
+              onClick={() => setCycleTab(value)}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                cycleTab === value
+                  ? 'bg-purple-600 text-white'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+              }`}
+            >
+              {label}
+              <span className={`ml-2 px-1.5 py-0.5 text-xs rounded-full ${
+                cycleTab === value ? 'bg-purple-500 text-white' : 'bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300'
+              }`}>
+                {count}
+              </span>
+            </button>
+          ))}
         </div>
 
         <OrderFilters
