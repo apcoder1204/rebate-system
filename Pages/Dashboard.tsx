@@ -36,7 +36,11 @@ export default function Dashboard() {
   const [contracts, setContracts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [myRequests, setMyRequests] = useState<RebateRequest[]>([]);
-  const [apiStats, setApiStats] = useState<{ totalContracts: number; activeContracts: number; totalOrders: number; totalSpent: number; availableRebate: number; paidRebate: number } | null>(null);
+  const [apiStats, setApiStats] = useState<{
+    activeContracts: number; totalOrders: number; totalSpent: number; availableRebate: number; paidRebate: number;
+    currentContracts: number; currentOrders: number; currentTotalSpent: number; currentEstimatedRebate: number;
+    previousContracts: number; previousOrders: number; previousTotalSpent: number; previousUnpaidRebate: number; previousPaidRebate: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [redeemContract, setRedeemContract] = useState<any>(null);
@@ -88,11 +92,18 @@ export default function Dashboard() {
   useEffect(() => { loadData(); }, [loadData]);
 
   const stats = {
-    totalOrders: apiStats?.totalOrders ?? 0,
-    totalSpent: apiStats?.totalSpent ?? 0,
     availableRebate: apiStats?.availableRebate ?? 0,
-    paidRebate: apiStats?.paidRebate ?? 0,
-    activeContracts: apiStats?.activeContracts ?? 0,
+    // current cycle
+    currentContracts: apiStats?.currentContracts ?? 0,
+    currentOrders: apiStats?.currentOrders ?? 0,
+    currentTotalSpent: apiStats?.currentTotalSpent ?? 0,
+    currentEstimatedRebate: apiStats?.currentEstimatedRebate ?? 0,
+    // previous cycle
+    previousContracts: apiStats?.previousContracts ?? 0,
+    previousOrders: apiStats?.previousOrders ?? 0,
+    previousTotalSpent: apiStats?.previousTotalSpent ?? 0,
+    previousUnpaidRebate: apiStats?.previousUnpaidRebate ?? 0,
+    previousPaidRebate: apiStats?.previousPaidRebate ?? 0,
   };
   const userRole = user?.role || 'user';
   const isStaff = ['admin', 'manager', 'staff'].includes(userRole);
@@ -170,7 +181,7 @@ export default function Dashboard() {
           </div>
           {!isStaff && (
             <div className="flex items-center gap-3 flex-wrap">
-              {stats.availableRebate > 0 && !hasPendingRequest && redeemableContract && (
+              {stats.previousUnpaidRebate > 0 && !hasPendingRequest && redeemableContract && (
                 <Button
                   onClick={handleRedeemClick}
                   className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-lg shadow-green-500/30"
@@ -195,54 +206,78 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Stat cards */}
-        <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${isStaff ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
-          <StatsCard
-            title={isStaff ? "Total Contracts" : "Active Contracts"}
-            value={stats.activeContracts}
-            icon={<FileText className="w-6 h-6 text-white" />}
-          />
-          <StatsCard
-            title="Total Orders"
-            value={stats.totalOrders}
-            icon={<ShoppingCart className="w-6 h-6 text-white" />}
-          />
-          {!isStaff ? (
-            <>
+        {/* Current cycle */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-5 rounded-full bg-blue-500" />
+            <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Current Cycle <span className="normal-case font-normal text-slate-400 dark:text-slate-500">— ends Dec 31, 2026</span>
+            </h2>
+          </div>
+          <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${isStaff ? 'lg:grid-cols-4' : 'lg:grid-cols-4'}`}>
+            <StatsCard
+              title={isStaff ? "Active Contracts" : "My Contract"}
+              value={stats.currentContracts}
+              icon={<FileText className="w-6 h-6 text-white" />}
+            />
+            <StatsCard
+              title="Orders This Cycle"
+              value={stats.currentOrders}
+              icon={<ShoppingCart className="w-6 h-6 text-white" />}
+            />
+            <StatsCard
+              title="Amount Spent"
+              value={`Tsh ${stats.currentTotalSpent.toFixed(2)}`}
+              icon={<DollarSign className="w-6 h-6 text-white" />}
+            />
+            <StatsCard
+              title="Est. Rebate"
+              value={`Tsh ${stats.currentEstimatedRebate.toFixed(2)}`}
+              icon={<Wallet className="w-6 h-6 text-white" />}
+              trend={stats.currentEstimatedRebate > 0 ? { value: 1, isPositive: true } : undefined}
+            />
+          </div>
+        </div>
+
+        {/* Previous cycle */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-5 rounded-full bg-slate-400" />
+            <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Previous Cycle <span className="normal-case font-normal text-slate-400 dark:text-slate-500">— ended Jun 30, 2026</span>
+            </h2>
+          </div>
+          <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${isStaff ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
+            {isStaff && (
               <StatsCard
-                title="Available Rebate"
-                value={`Tsh ${stats.availableRebate.toFixed(2)}`}
-                icon={<Wallet className="w-6 h-6 text-white" />}
-                trend={stats.availableRebate > 0 ? { value: 100, isPositive: true } : undefined}
+                title="Expired Contracts"
+                value={stats.previousContracts}
+                icon={<FileText className="w-6 h-6 text-white" />}
               />
-              <StatsCard
-                title="Paid Rebate"
-                value={`Tsh ${stats.paidRebate.toFixed(2)}`}
-                icon={<CheckCircle className="w-6 h-6 text-white" />}
-                trend={stats.paidRebate > 0 ? { value: 100, isPositive: true } : undefined}
-              />
-            </>
-          ) : (
-            <>
-              <StatsCard
-                title="Total Spent"
-                value={`Tsh ${stats.totalSpent.toFixed(2)}`}
-                icon={<DollarSign className="w-6 h-6 text-white" />}
-              />
-              <StatsCard
-                title="Unpaid Rebate"
-                value={`Tsh ${stats.availableRebate.toFixed(2)}`}
-                icon={<Wallet className="w-6 h-6 text-white" />}
-                trend={stats.availableRebate > 0 ? { value: Math.round((stats.availableRebate / (stats.availableRebate + stats.paidRebate || 1)) * 100), isPositive: false } : undefined}
-              />
-              <StatsCard
-                title="Rebate Paid"
-                value={`Tsh ${stats.paidRebate.toFixed(2)}`}
-                icon={<CheckCircle className="w-6 h-6 text-white" />}
-                trend={stats.paidRebate > 0 ? { value: Math.round((stats.paidRebate / (stats.availableRebate + stats.paidRebate || 1)) * 100), isPositive: true } : undefined}
-              />
-            </>
-          )}
+            )}
+            <StatsCard
+              title="Past Orders"
+              value={stats.previousOrders}
+              icon={<ShoppingCart className="w-6 h-6 text-white" />}
+            />
+            <StatsCard
+              title="Past Spend"
+              value={`Tsh ${stats.previousTotalSpent.toFixed(2)}`}
+              icon={<DollarSign className="w-6 h-6 text-white" />}
+            />
+            <StatsCard
+              title="Rebate Pending"
+              value={`Tsh ${stats.previousUnpaidRebate.toFixed(2)}`}
+              icon={<Wallet className="w-6 h-6 text-white" />}
+              trend={stats.previousUnpaidRebate > 0 ? { value: Math.round((stats.previousUnpaidRebate / ((stats.previousUnpaidRebate + stats.previousPaidRebate) || 1)) * 100), isPositive: false } : undefined}
+            />
+            <StatsCard
+              title="Rebate Paid"
+              value={`Tsh ${stats.previousPaidRebate.toFixed(2)}`}
+              icon={<CheckCircle className="w-6 h-6 text-white" />}
+              trend={stats.previousPaidRebate > 0 ? { value: Math.round((stats.previousPaidRebate / ((stats.previousUnpaidRebate + stats.previousPaidRebate) || 1)) * 100), isPositive: true } : undefined}
+            />
+          </div>
         </div>
 
         {/* Pending redemption banner */}
@@ -328,7 +363,7 @@ export default function Dashboard() {
                 Available to redeem
               </p>
               <p className="text-4xl font-black text-white tracking-tight">
-                Tsh {Number(stats.availableRebate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                Tsh {Number(stats.previousUnpaidRebate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
               <p className="text-emerald-200 text-xs mt-2 flex items-center gap-1.5">
                 <CheckCircle className="w-3.5 h-3.5 shrink-0" />

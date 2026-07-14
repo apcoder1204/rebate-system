@@ -156,12 +156,20 @@ export const Order = {
     });
   },
   async getDashboardStats(): Promise<{
-    totalContracts: number;
     activeContracts: number;
     totalOrders: number;
     totalSpent: number;
     availableRebate: number;
     paidRebate: number;
+    currentContracts: number;
+    currentOrders: number;
+    currentTotalSpent: number;
+    currentEstimatedRebate: number;
+    previousContracts: number;
+    previousOrders: number;
+    previousTotalSpent: number;
+    previousUnpaidRebate: number;
+    previousPaidRebate: number;
   }> {
     return apiRequest('/orders/stats');
   },

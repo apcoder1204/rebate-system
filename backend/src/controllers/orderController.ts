@@ -806,39 +806,73 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
 export const getDashboardStats = async (req: AuthRequest, res: Response) => {
   try {
     const isStaff = ['admin', 'manager', 'staff'].includes(req.user!.role);
+    const CURRENT = `('active','approved','pending_approval','pending')`;
 
     let result;
     if (isStaff) {
       result = await readQuery(`
         SELECT
-          (SELECT COUNT(*)::int FROM contracts) AS total_contracts,
+          -- legacy flat totals (kept for backward compat)
           (SELECT COUNT(*)::int FROM contracts WHERE status NOT IN ('expired','cancelled','rejected')) AS active_contracts,
           (SELECT COUNT(*)::int FROM orders) AS total_orders,
           COALESCE((SELECT SUM(total_amount) FROM orders), 0)::numeric AS total_spent,
           COALESCE((SELECT SUM(rebate_amount) FROM orders WHERE rebate_status != 'paid'), 0)::numeric AS available_rebate,
-          COALESCE((SELECT SUM(rebate_amount) FROM orders WHERE rebate_status = 'paid'), 0)::numeric AS paid_rebate
+          COALESCE((SELECT SUM(rebate_amount) FROM orders WHERE rebate_status = 'paid'), 0)::numeric AS paid_rebate,
+          -- current cycle
+          (SELECT COUNT(*)::int FROM contracts WHERE status IN ${CURRENT}) AS current_contracts,
+          (SELECT COUNT(*)::int FROM orders o JOIN contracts c ON o.contract_id = c.id WHERE c.status IN ${CURRENT}) AS current_orders,
+          COALESCE((SELECT SUM(o.total_amount) FROM orders o JOIN contracts c ON o.contract_id = c.id WHERE c.status IN ${CURRENT}), 0)::numeric AS current_total_spent,
+          COALESCE((SELECT SUM(o.rebate_amount) FROM orders o JOIN contracts c ON o.contract_id = c.id WHERE c.status IN ${CURRENT}), 0)::numeric AS current_estimated_rebate,
+          -- previous cycle
+          (SELECT COUNT(*)::int FROM contracts WHERE status = 'expired') AS previous_contracts,
+          (SELECT COUNT(*)::int FROM orders o JOIN contracts c ON o.contract_id = c.id WHERE c.status = 'expired') AS previous_orders,
+          COALESCE((SELECT SUM(o.total_amount) FROM orders o JOIN contracts c ON o.contract_id = c.id WHERE c.status = 'expired'), 0)::numeric AS previous_total_spent,
+          COALESCE((SELECT SUM(o.rebate_amount) FROM orders o JOIN contracts c ON o.contract_id = c.id WHERE c.status = 'expired' AND o.rebate_status = 'unpaid'), 0)::numeric AS previous_unpaid_rebate,
+          COALESCE((SELECT SUM(o.rebate_amount) FROM orders o JOIN contracts c ON o.contract_id = c.id WHERE c.status = 'expired' AND o.rebate_status = 'paid'), 0)::numeric AS previous_paid_rebate
       `);
     } else {
       const userId = req.user!.id;
       result = await readQuery(`
         SELECT
-          (SELECT COUNT(*)::int FROM contracts WHERE customer_id = $1) AS total_contracts,
+          -- legacy flat totals
           (SELECT COUNT(*)::int FROM contracts WHERE customer_id = $1 AND status IN ('active','approved')) AS active_contracts,
           (SELECT COUNT(*)::int FROM orders WHERE customer_id = $1) AS total_orders,
           COALESCE((SELECT SUM(total_amount) FROM orders WHERE customer_id = $1), 0)::numeric AS total_spent,
           COALESCE((SELECT SUM(rebate_amount) FROM orders WHERE customer_id = $1 AND rebate_status != 'paid'), 0)::numeric AS available_rebate,
-          COALESCE((SELECT SUM(rebate_amount) FROM orders WHERE customer_id = $1 AND rebate_status = 'paid'), 0)::numeric AS paid_rebate
+          COALESCE((SELECT SUM(rebate_amount) FROM orders WHERE customer_id = $1 AND rebate_status = 'paid'), 0)::numeric AS paid_rebate,
+          -- current cycle
+          (SELECT COUNT(*)::int FROM contracts WHERE customer_id = $1 AND status IN ${CURRENT}) AS current_contracts,
+          (SELECT COUNT(*)::int FROM orders o JOIN contracts c ON o.contract_id = c.id WHERE c.customer_id = $1 AND c.status IN ${CURRENT}) AS current_orders,
+          COALESCE((SELECT SUM(o.total_amount) FROM orders o JOIN contracts c ON o.contract_id = c.id WHERE c.customer_id = $1 AND c.status IN ${CURRENT}), 0)::numeric AS current_total_spent,
+          COALESCE((SELECT SUM(o.rebate_amount) FROM orders o JOIN contracts c ON o.contract_id = c.id WHERE c.customer_id = $1 AND c.status IN ${CURRENT}), 0)::numeric AS current_estimated_rebate,
+          -- previous cycle
+          (SELECT COUNT(*)::int FROM contracts WHERE customer_id = $1 AND status = 'expired') AS previous_contracts,
+          (SELECT COUNT(*)::int FROM orders o JOIN contracts c ON o.contract_id = c.id WHERE c.customer_id = $1 AND c.status = 'expired') AS previous_orders,
+          COALESCE((SELECT SUM(o.total_amount) FROM orders o JOIN contracts c ON o.contract_id = c.id WHERE c.customer_id = $1 AND c.status = 'expired'), 0)::numeric AS previous_total_spent,
+          COALESCE((SELECT SUM(o.rebate_amount) FROM orders o JOIN contracts c ON o.contract_id = c.id WHERE c.customer_id = $1 AND c.status = 'expired' AND o.rebate_status = 'unpaid'), 0)::numeric AS previous_unpaid_rebate,
+          COALESCE((SELECT SUM(o.rebate_amount) FROM orders o JOIN contracts c ON o.contract_id = c.id WHERE c.customer_id = $1 AND c.status = 'expired' AND o.rebate_status = 'paid'), 0)::numeric AS previous_paid_rebate
       `, [userId]);
     }
 
     const row = result.rows[0];
     res.json({
-      totalContracts: row.total_contracts || 0,
+      // legacy flat fields
       activeContracts: row.active_contracts || 0,
       totalOrders: row.total_orders || 0,
       totalSpent: parseFloat(row.total_spent) || 0,
       availableRebate: parseFloat(row.available_rebate) || 0,
       paidRebate: parseFloat(row.paid_rebate) || 0,
+      // current cycle
+      currentContracts: row.current_contracts || 0,
+      currentOrders: row.current_orders || 0,
+      currentTotalSpent: parseFloat(row.current_total_spent) || 0,
+      currentEstimatedRebate: parseFloat(row.current_estimated_rebate) || 0,
+      // previous cycle
+      previousContracts: row.previous_contracts || 0,
+      previousOrders: row.previous_orders || 0,
+      previousTotalSpent: parseFloat(row.previous_total_spent) || 0,
+      previousUnpaidRebate: parseFloat(row.previous_unpaid_rebate) || 0,
+      previousPaidRebate: parseFloat(row.previous_paid_rebate) || 0,
     });
   } catch (error) {
     console.error('Dashboard stats error:', error);

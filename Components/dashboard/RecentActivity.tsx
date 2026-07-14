@@ -36,11 +36,20 @@ export default function RecentActivity({ activities }: RecentActivityProps) {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <Badge className="bg-green-100 text-green-700">Active</Badge>;
+        return <Badge className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">Active</Badge>;
+      case 'approved':
+        return <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">Approved</Badge>;
       case 'pending':
-        return <Badge className="bg-amber-100 text-amber-700">Pending</Badge>;
+        return <Badge className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">Pending</Badge>;
+      case 'pending_approval':
+        return <Badge className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">Pending Approval</Badge>;
+      case 'confirmed':
       case 'completed':
-        return <Badge className="bg-blue-100 text-blue-700">Completed</Badge>;
+        return <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">Confirmed</Badge>;
+      case 'expired':
+        return <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">Expired</Badge>;
+      case 'disputed':
+        return <Badge className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">Disputed</Badge>;
       default:
         return null;
     }
