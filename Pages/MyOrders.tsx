@@ -33,7 +33,7 @@ export default function MyOrders() {
   const [grandTotalAmount, setGrandTotalAmount] = useState(0);
   const [grandTotalRebate, setGrandTotalRebate] = useState(0);
   const [unpaidEligibleRebate, setUnpaidEligibleRebate] = useState(0);
-  const [cycleTab, setCycleTab] = useState<'current' | 'previous' | 'all'>('current');
+  const [cycleTab, setCycleTab] = useState<'current' | 'previous' | 'all'>('all');
   const navigate = useNavigate();
 
   const loadData = useCallback(async (page = 1) => {

@@ -23,7 +23,7 @@ const CURRENT_CONTRACT_STATUSES = ['active', 'approved', 'pending_approval', 'pe
 export default function OrdersList({ orders, onRefresh, onEdit, canEdit, currentUserRole, currentUserId }: OrdersListProps) {
   const { showSuccess, showError, showWarning } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
-  const [tab, setTab] = useState<'current' | 'previous' | 'all'>('current');
+  const [tab, setTab] = useState<'current' | 'previous' | 'all'>('all');
   const safeOrders = Array.isArray(orders) ? orders : [];
 
   const currentCount = safeOrders.filter(o => CURRENT_CONTRACT_STATUSES.includes(o.contract_status)).length;
