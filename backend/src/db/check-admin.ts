@@ -29,7 +29,7 @@ async function checkAdmin() {
   
   // Check backup database (localhost)
   try {
-    const backupResult = await backupPool.query(
+    const backupResult = await backupPool!.query(
       'SELECT id, email, full_name, role, password_hash FROM users WHERE email = $1',
       [adminEmail]
     );

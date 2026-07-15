@@ -30,7 +30,7 @@ export async function syncToBackup() {
         }
 
         // Check if table exists in backup
-        const tableExists = await backupPool.query(`
+        const tableExists = await backupPool!.query(`
           SELECT EXISTS (
             SELECT FROM information_schema.tables 
             WHERE table_schema = 'public' 
@@ -44,7 +44,7 @@ export async function syncToBackup() {
         }
 
         // Get existing IDs in backup to avoid duplicates
-        const existingIds = await backupPool.query(`SELECT id FROM ${table}`);
+        const existingIds = await backupPool!.query(`SELECT id FROM ${table}`);
         const existingIdSet = new Set(existingIds.rows.map((row: any) => row.id));
 
         // Insert new records
@@ -63,7 +63,7 @@ export async function syncToBackup() {
           const placeholders = columns.map((_, index) => row[columns[index]]);
 
           try {
-            await backupPool.query(
+            await backupPool!.query(
               `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${values.join(', ')}) ON CONFLICT DO NOTHING`,
               placeholders
             );
@@ -106,7 +106,7 @@ export async function syncToPrimary() {
       try {
         console.log(`📦 Syncing ${table}...`);
 
-        const backupData = await backupPool.query(`SELECT * FROM ${table}`);
+        const backupData = await backupPool!.query(`SELECT * FROM ${table}`);
 
         if (backupData.rows.length === 0) {
           console.log(`   ⏭️  ${table} is empty, skipping`);

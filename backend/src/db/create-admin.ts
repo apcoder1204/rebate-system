@@ -44,13 +44,13 @@ async function createAdmin() {
   
   // Create on backup database (localhost)
   try {
-    const backupCheck = await backupPool.query(
+    const backupCheck = await backupPool!.query(
       'SELECT id FROM users WHERE email = $1',
       [adminEmail]
     );
     
     if (backupCheck.rows.length === 0) {
-      await backupPool.query(
+      await backupPool!.query(
         `INSERT INTO users (email, password_hash, full_name, role) 
          VALUES ($1, $2, $3, $4)`,
         [adminEmail, hashedPassword, adminName, 'admin']
@@ -60,7 +60,7 @@ async function createAdmin() {
       console.log('   Password:', adminPassword);
     } else {
       // Update password if user exists
-      await backupPool.query(
+      await backupPool!.query(
         'UPDATE users SET password_hash = $1 WHERE email = $2',
         [hashedPassword, adminEmail]
       );

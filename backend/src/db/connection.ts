@@ -3,45 +3,11 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Primary Database (Neon)
-// Helper function to ensure connection string has proper pooler parameters
-function ensurePoolerConfig(connectionString: string): string {
-  if (!connectionString) return connectionString;
-  
-  // Check if it's a Neon pooler URL (contains -pooler.)
-  const isPoolerUrl = connectionString.includes('-pooler.');
-  
-  // If using pooler, ensure pgbouncer=true is set for transaction pooling
-  if (isPoolerUrl && !connectionString.includes('pgbouncer=true')) {
-    const separator = connectionString.includes('?') ? '&' : '?';
-    connectionString = `${connectionString}${separator}pgbouncer=true`;
-  }
-  
-  return connectionString;
-}
+// DEV_LOCAL_ONLY=true → all queries go to localhost; Neon is never touched.
+// Remove or set to false when ready to push changes to production Neon DB.
+const DEV_LOCAL_ONLY = process.env.DEV_LOCAL_ONLY === 'true';
 
-const neonConnectionString = ensurePoolerConfig(
-  process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || ''
-);
-
-const primaryPool = new Pool({
-  connectionString: neonConnectionString,
-  max: 10,
-  // Keep idle timeout shorter than Neon/pgbouncer's server-side idle timeout (~5 min).
-  // This ensures the Node pool evicts stale connections BEFORE the server silently drops them,
-  // preventing the "empty error message" silent-drop problem.
-  idleTimeoutMillis: 60000, // 1 minute — pool evicts before pgbouncer drops
-  connectionTimeoutMillis: 15000, // 15 seconds
-  // Keep connections alive at TCP level
-  keepAlive: true,
-  keepAliveInitialDelayMillis: 5000,
-  // SSL configuration
-  ssl: process.env.NEON_DATABASE_URL ? { rejectUnauthorized: false } : undefined,
-  allowExitOnIdle: false,
-});
-
-// Backup Database (Localhost)
-const backupPool = new Pool({
+const localConfig = {
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '5432'),
   database: process.env.DB_NAME || 'rebate_system',
@@ -49,12 +15,48 @@ const backupPool = new Pool({
   password: process.env.DB_PASSWORD || 'postgres',
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
+  connectionTimeoutMillis: 5000,
+};
+
+// Helper function to ensure connection string has proper pooler parameters
+function ensurePoolerConfig(connectionString: string): string {
+  if (!connectionString) return connectionString;
+  const isPoolerUrl = connectionString.includes('-pooler.');
+  if (isPoolerUrl && !connectionString.includes('pgbouncer=true')) {
+    const separator = connectionString.includes('?') ? '&' : '?';
+    connectionString = `${connectionString}${separator}pgbouncer=true`;
+  }
+  return connectionString;
+}
+
+// Primary pool: localhost in dev mode, Neon in production
+const primaryPool = DEV_LOCAL_ONLY
+  ? new Pool(localConfig)
+  : new Pool({
+      connectionString: ensurePoolerConfig(
+        process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || ''
+      ),
+      max: 10,
+      idleTimeoutMillis: 60000,
+      connectionTimeoutMillis: 15000,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 5000,
+      ssl: { rejectUnauthorized: false },
+      allowExitOnIdle: false,
+    });
+
+// Backup pool: only used in production mode (localhost mirror)
+const backupPool = DEV_LOCAL_ONLY
+  ? null  // no backup needed when primary IS localhost
+  : new Pool(localConfig);
+
+if (DEV_LOCAL_ONLY) {
+  console.log('🔧 DEV_LOCAL_ONLY mode — all queries routed to localhost, Neon untouched');
+}
 
 // Error handlers with retry logic
 primaryPool.on('error', (err) => {
-  console.error('❌ Primary database (Neon) error:', err.message);
+  console.error(`❌ ${DEV_LOCAL_ONLY ? 'Local' : 'Neon'} database error:`, err.message);
   // Log connection state for debugging
   console.error('Pool stats:', {
     totalCount: primaryPool.totalCount,
@@ -98,23 +100,18 @@ primaryPool.on('acquire', () => {
   // Connection acquired successfully
 });
 
-backupPool.on('error', (err) => {
-  console.error('❌ Backup database (localhost) error:', err.message);
-  // Prevent unhandled error event
-  if (err instanceof Error) {
-    err.name = 'HandledPoolError';
-  }
-});
-
-// Handle client-level errors for backup pool
-backupPool.on('connect', (client) => {
-  client.on('error', (err: Error) => {
-    console.error('⚠️  Backup client connection error (handled):', err.message);
-    if (err.name !== 'HandledClientError') {
-      err.name = 'HandledClientError';
-    }
+if (backupPool) {
+  backupPool.on('error', (err) => {
+    console.error('❌ Backup database (localhost) error:', err.message);
+    if (err instanceof Error) err.name = 'HandledPoolError';
   });
-});
+  backupPool.on('connect', (client) => {
+    client.on('error', (err: Error) => {
+      console.error('⚠️  Backup client connection error (handled):', err.message);
+      if (err.name !== 'HandledClientError') err.name = 'HandledClientError';
+    });
+  });
+}
 
 // Test connections with retry logic
 async function testConnectionWithRetry(
@@ -140,8 +137,11 @@ async function testConnectionWithRetry(
 }
 
 async function testConnections() {
-  await testConnectionWithRetry(primaryPool, 'Primary database (Neon)', 3, 2000);
-  await testConnectionWithRetry(backupPool, 'Backup database (localhost)', 3, 1000);
+  const primaryName = DEV_LOCAL_ONLY ? 'Local database (dev)' : 'Primary database (Neon)';
+  await testConnectionWithRetry(primaryPool, primaryName, 3, 2000);
+  if (backupPool) {
+    await testConnectionWithRetry(backupPool, 'Backup database (localhost)', 3, 1000);
+  }
 }
 
 // Persistent connection management for long-term idle periods
@@ -161,11 +161,9 @@ function startHealthCheck(intervalSeconds: number = 60) {
     if (isShuttingDown) return;
     
     try {
-      // Quick health check on primary (Neon) - this keeps the connection alive
       await primaryPool.query('SELECT 1');
-      // Connection is healthy - silently maintain it
     } catch (error: any) {
-      console.warn('⚠️  Neon health check failed:', error.message);
+      console.warn(`⚠️  ${DEV_LOCAL_ONLY ? 'Local' : 'Neon'} health check failed:`, error.message);
       // Try to reconnect immediately
       await reconnectPrimary();
     }
@@ -266,7 +264,7 @@ process.on('SIGINT', () => {
   if (healthCheckInterval) clearInterval(healthCheckInterval);
   if (connectionWarmerInterval) clearInterval(connectionWarmerInterval);
   primaryPool.end().catch(() => {});
-  backupPool.end().catch(() => {});
+  backupPool?.end().catch(() => {});
   process.exit(0);
 });
 
@@ -275,7 +273,7 @@ process.on('SIGTERM', () => {
   if (healthCheckInterval) clearInterval(healthCheckInterval);
   if (connectionWarmerInterval) clearInterval(connectionWarmerInterval);
   primaryPool.end().catch(() => {});
-  backupPool.end().catch(() => {});
+  backupPool?.end().catch(() => {});
   process.exit(0);
 });
 
@@ -285,13 +283,16 @@ export async function dualQuery(
   params?: any[],
   options?: { skipBackup?: boolean; skipPrimary?: boolean }
 ): Promise<any> {
+  // In DEV_LOCAL_ONLY mode, primary IS localhost — just run it directly
+  if (DEV_LOCAL_ONLY) {
+    return primaryPool.query(queryText, params);
+  }
+
   const results: { primary?: any; backup?: any; error?: any } = {};
 
-  // Execute on primary (Neon)
   if (!options?.skipPrimary) {
     try {
-      const primaryResult = await primaryPool.query(queryText, params);
-      results.primary = primaryResult;
+      results.primary = await primaryPool.query(queryText, params);
     } catch (error: any) {
       if (isTransientConnectionError(error)) {
         console.warn('⚠️  Primary write failed (connection), reconnecting...');
@@ -304,37 +305,29 @@ export async function dualQuery(
             results.error = retryError;
           }
         } else {
-          console.error('❌ Reconnection failed for write');
           results.error = error;
         }
       } else {
         console.error('❌ Primary write failed (SQL error):', error.message);
         results.error = error;
       }
-      // Continue to backup even if primary fails
     }
   }
 
-  // Execute on backup (localhost)
-  if (!options?.skipBackup) {
+  if (!options?.skipBackup && backupPool) {
     try {
-      const backupResult = await backupPool.query(queryText, params);
-      results.backup = backupResult;
+      results.backup = await backupPool.query(queryText, params);
     } catch (error: any) {
       console.error('⚠️  Backup database query failed:', error.message);
-      // Don't throw - backup is optional
     }
   }
 
-  // Return primary result if available, otherwise backup
-  if (results.primary) {
-    return results.primary;
-  } else if (results.backup) {
+  if (results.primary) return results.primary;
+  if (results.backup) {
     console.warn('⚠️  Using backup database result (primary unavailable)');
     return results.backup;
-  } else {
-    throw results.error || new Error('Both databases failed');
   }
+  throw results.error || new Error('Both databases failed');
 }
 
 // Detect whether a pg error is a transient connection problem vs a real SQL error.
@@ -358,39 +351,39 @@ function isTransientConnectionError(error: any): boolean {
   );
 }
 
-// Read-only query — tries primary (Neon), reconnects on transient errors, falls back to backup.
-// SQL errors (bad column, syntax, etc.) are NOT retried on backup — both DBs would fail identically.
+// Read-only query — in dev mode hits localhost directly; in prod tries Neon with local fallback.
 export async function readQuery(queryText: string, params?: any[]): Promise<any> {
+  // In dev mode, primary is already localhost — just query it
+  if (DEV_LOCAL_ONLY) {
+    return primaryPool.query(queryText, params);
+  }
+
   try {
     return await primaryPool.query(queryText, params);
   } catch (error: any) {
     if (isTransientConnectionError(error)) {
-      // Neon dropped the connection — try to reconnect, then retry the query
       console.warn('⚠️  Neon connection dropped, reconnecting...');
       const reconnected = await reconnectPrimary(3);
       if (reconnected) {
         try {
           return await primaryPool.query(queryText, params);
         } catch (retryError: any) {
-          if (!isTransientConnectionError(retryError)) {
-            // SQL error after reconnect — don't bother with backup
-            throw retryError;
-          }
+          if (!isTransientConnectionError(retryError)) throw retryError;
           console.error('❌ Still failing after reconnect, using backup DB');
         }
       } else {
         console.error('❌ Neon reconnect failed, using backup DB');
       }
-      // Fall through to backup
-      try {
-        return await backupPool.query(queryText, params);
-      } catch (backupErr: any) {
-        console.error('⚠️  Backup also failed:', backupErr.message);
-        throw error; // throw original Neon error
+      if (backupPool) {
+        try {
+          return await backupPool.query(queryText, params);
+        } catch (backupErr: any) {
+          console.error('⚠️  Backup also failed:', backupErr.message);
+          throw error;
+        }
       }
+      throw error;
     } else {
-      // Real SQL error (bad column name, constraint violation, etc.)
-      // Do NOT fall back — backup would return same error, masking the real problem
       throw error;
     }
   }
@@ -410,17 +403,14 @@ export async function dualTransaction<T>(
   let backupClient: any = null;
 
   try {
-    // Start transaction on primary
     await primaryClient.query('BEGIN');
 
-    // Start transaction on backup (if not skipped)
-    if (!options?.skipBackup) {
+    if (!options?.skipBackup && backupPool) {
       try {
         backupClient = await backupPool.connect();
         await backupClient.query('BEGIN');
       } catch (error: any) {
         console.warn('⚠️  Backup transaction start failed:', error.message);
-        // Continue with primary only
       }
     }
 
@@ -469,28 +459,20 @@ export async function dualTransaction<T>(
 // Export pools for direct access if needed
 export { primaryPool, backupPool };
 
-// Default export: use primary pool for backward compatibility
-// But wrap it to also write to backup
+// Default export: routes reads/writes appropriately
 const defaultPool = {
   query: async (text: string, params?: any[]) => {
-    // Check if it's a write operation (INSERT, UPDATE, DELETE, etc.)
     const isWriteOperation = /^\s*(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE)/i.test(text.trim());
-    
-    if (isWriteOperation) {
-      // Write operations go to both databases
-      return writeQuery(text, params);
-    } else {
-      // Read operations (SELECT) go to primary (with fallback to backup)
-      return readQuery(text, params);
-    }
+    return isWriteOperation ? writeQuery(text, params) : readQuery(text, params);
   },
   connect: () => primaryPool.connect(),
   end: async () => {
-    await Promise.all([primaryPool.end(), backupPool.end()]);
+    await primaryPool.end();
+    await backupPool?.end();
   },
   on: (event: 'error' | 'connect' | 'acquire' | 'remove' | 'release', callback: (err?: Error, client?: any) => void) => {
     primaryPool.on(event as any, callback as any);
-    backupPool.on(event as any, callback as any);
+    backupPool?.on(event as any, callback as any);
     return defaultPool;
   },
 };

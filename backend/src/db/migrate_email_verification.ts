@@ -22,7 +22,7 @@ async function migrateEmailVerification() {
   // Run on backup database
   try {
     console.log('📊 Migrating backup database (localhost)...');
-    await backupPool.query(migrationSQL);
+    await backupPool!.query(migrationSQL);
     console.log('✅ Backup database migrated successfully\n');
   } catch (error: any) {
     console.error('❌ Backup database migration failed:', error.message);

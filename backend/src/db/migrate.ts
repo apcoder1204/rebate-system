@@ -53,11 +53,11 @@ async function migrate() {
     // Migrate backup database (localhost)
     try {
       console.log('🔄 Running base schema migration on Backup (Localhost)...');
-      await backupPool.query(schema);
+      await backupPool!.query(schema);
       console.log('✅ Base schema applied to Backup.');
       
       // Run additional migrations
-      await runMigrations(backupPool, 'Backup (Localhost)');
+      await runMigrations(backupPool!, 'Backup (Localhost)');
     } catch (error: any) {
       console.error('⚠️  Backup database migration failed:', error.message);
     }
@@ -88,13 +88,13 @@ async function migrate() {
     
     // Backup database
     try {
-      const backupResult = await backupPool.query(
+      const backupResult = await backupPool!.query(
         'SELECT id FROM users WHERE email = $1',
         [adminEmail]
       );
       
       if (backupResult.rows.length === 0) {
-        await backupPool.query(
+        await backupPool!.query(
           `INSERT INTO users (email, password_hash, full_name, role) 
            VALUES ($1, $2, $3, $4)`,
           [adminEmail, hashedPassword, 'apcoder', 'admin']
