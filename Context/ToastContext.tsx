@@ -29,7 +29,6 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         duration,
       };
 
-      console.log('Showing toast:', newToast); // Debug log
       setToasts((prev) => [...prev, newToast]);
     },
     []
@@ -68,23 +67,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       value={{ showToast, showSuccess, showError, showWarning, showInfo }}
     >
       {children}
-      {/* Toast Container - Centered on screen */}
-      {toasts.length > 0 && (
-        <div 
-          className="fixed inset-0 pointer-events-none z-[9999] flex items-center justify-center"
-          style={{ zIndex: 9999 }}
-        >
-          <div className="flex flex-col gap-3 items-center pointer-events-auto">
-            {toasts.map((toast) => (
-              <ToastComponent
-                key={toast.id}
-                toast={toast}
-                onClose={removeToast}
-              />
-            ))}
+      {/* Toast container — top-right */}
+      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2.5 items-end pointer-events-none">
+        {toasts.map((toast) => (
+          <div key={toast.id} className="pointer-events-auto">
+            <ToastComponent toast={toast} onClose={removeToast} />
           </div>
-        </div>
-      )}
+        ))}
+      </div>
     </ToastContext.Provider>
   );
 }

@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { CheckCircle, XCircle, AlertCircle, Info, X } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { CheckCircle, XCircle, AlertTriangle, Info, X } from "lucide-react";
 
 export type ToastType = "success" | "error" | "warning" | "info";
 
@@ -15,82 +15,115 @@ interface ToastProps {
   onClose: (id: string) => void;
 }
 
+const CONFIG: Record<ToastType, {
+  icon: React.ReactNode;
+  bar: string;
+  bg: string;
+  border: string;
+  title: string;
+  text: string;
+  close: string;
+}> = {
+  success: {
+    icon: <CheckCircle className="w-5 h-5 text-emerald-500 dark:text-emerald-400 shrink-0" />,
+    bar: 'bg-emerald-500',
+    bg: 'bg-white dark:bg-slate-800',
+    border: 'border-emerald-200 dark:border-emerald-700/60',
+    title: 'text-emerald-800 dark:text-emerald-200',
+    text: 'text-slate-600 dark:text-slate-300',
+    close: 'text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400',
+  },
+  error: {
+    icon: <XCircle className="w-5 h-5 text-red-500 dark:text-red-400 shrink-0" />,
+    bar: 'bg-red-500',
+    bg: 'bg-white dark:bg-slate-800',
+    border: 'border-red-200 dark:border-red-700/60',
+    title: 'text-red-800 dark:text-red-200',
+    text: 'text-slate-600 dark:text-slate-300',
+    close: 'text-slate-400 hover:text-red-600 dark:hover:text-red-400',
+  },
+  warning: {
+    icon: <AlertTriangle className="w-5 h-5 text-amber-500 dark:text-amber-400 shrink-0" />,
+    bar: 'bg-amber-500',
+    bg: 'bg-white dark:bg-slate-800',
+    border: 'border-amber-200 dark:border-amber-700/60',
+    title: 'text-amber-800 dark:text-amber-200',
+    text: 'text-slate-600 dark:text-slate-300',
+    close: 'text-slate-400 hover:text-amber-600 dark:hover:text-amber-400',
+  },
+  info: {
+    icon: <Info className="w-5 h-5 text-blue-500 dark:text-blue-400 shrink-0" />,
+    bar: 'bg-blue-500',
+    bg: 'bg-white dark:bg-slate-800',
+    border: 'border-blue-200 dark:border-blue-700/60',
+    title: 'text-blue-800 dark:text-blue-200',
+    text: 'text-slate-600 dark:text-slate-300',
+    close: 'text-slate-400 hover:text-blue-600 dark:hover:text-blue-400',
+  },
+};
+
 export function ToastComponent({ toast, onClose }: ToastProps) {
+  const duration = toast.duration || 4000;
+  const [progress, setProgress] = useState(100);
+  const [visible, setVisible] = useState(false);
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      onClose(toast.id);
-    }, toast.duration || 4000);
+    // Trigger slide-in
+    const show = requestAnimationFrame(() => setVisible(true));
 
-    return () => clearTimeout(timer);
-  }, [toast.id, toast.duration, onClose]);
+    // Progress bar countdown
+    const start = Date.now();
+    const tick = setInterval(() => {
+      const elapsed = Date.now() - start;
+      setProgress(Math.max(0, 100 - (elapsed / duration) * 100));
+    }, 50);
 
-  const getIcon = () => {
-    switch (toast.type) {
-      case "success":
-        return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case "error":
-        return <XCircle className="w-5 h-5 text-red-600" />;
-      case "warning":
-        return <AlertCircle className="w-5 h-5 text-amber-600" />;
-      case "info":
-        return <Info className="w-5 h-5 text-blue-600" />;
-    }
-  };
+    // Auto-dismiss
+    const dismiss = setTimeout(() => {
+      setVisible(false);
+      setTimeout(() => onClose(toast.id), 300);
+    }, duration);
 
-  const getBgColor = () => {
-    switch (toast.type) {
-      case "success":
-        return "bg-green-50 border-green-200";
-      case "error":
-        return "bg-red-50 border-red-200";
-      case "warning":
-        return "bg-amber-50 border-amber-200";
-      case "info":
-        return "bg-blue-50 border-blue-200";
-    }
-  };
+    return () => {
+      cancelAnimationFrame(show);
+      clearInterval(tick);
+      clearTimeout(dismiss);
+    };
+  }, [toast.id, duration, onClose]);
 
-  const getTextColor = () => {
-    switch (toast.type) {
-      case "success":
-        return "text-green-800";
-      case "error":
-        return "text-red-800";
-      case "warning":
-        return "text-amber-800";
-      case "info":
-        return "text-blue-800";
-    }
-  };
+  const c = CONFIG[toast.type];
 
   return (
     <div
-      className={`
-        ${getBgColor()}
-        border-2 rounded-lg shadow-2xl p-5 min-w-[320px] max-w-md
-        flex items-start gap-3
-        relative
-      `}
-      style={{
-        animation: 'slideInFadeIn 0.3s ease-out',
-        zIndex: 10000
-      }}
+      className={`relative w-80 max-w-[calc(100vw-2rem)] rounded-xl border shadow-xl overflow-hidden
+        ${c.bg} ${c.border}
+        transition-all duration-300 ease-out
+        ${visible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}
     >
-      <div className="flex-shrink-0 mt-0.5">
-        {getIcon()}
-      </div>
-      <div className="flex-1">
-        <p className={`text-sm font-medium ${getTextColor()}`}>
+      {/* Left accent stripe */}
+      <div className={`absolute inset-y-0 left-0 w-1 ${c.bar}`} />
+
+      <div className="flex items-start gap-3 pl-4 pr-3 pt-3.5 pb-3">
+        <div className="mt-0.5">{c.icon}</div>
+        <p className={`flex-1 text-sm font-medium leading-snug ${c.title}`}>
           {toast.message}
         </p>
+        <button
+          onClick={() => { setVisible(false); setTimeout(() => onClose(toast.id), 300); }}
+          className={`mt-0.5 rounded-md p-0.5 transition-colors ${c.close}`}
+          aria-label="Dismiss"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
-      <button
-        onClick={() => onClose(toast.id)}
-        className="flex-shrink-0 text-slate-400 hover:text-slate-600 transition-colors"
-      >
-        <X className="w-4 h-4" />
-      </button>
+
+      {/* Auto-dismiss progress bar */}
+      <div className="h-0.5 bg-slate-100 dark:bg-slate-700">
+        <div
+          className={`h-full ${c.bar} opacity-60 transition-none`}
+          style={{ width: `${progress}%` }}
+        />
+      </div>
     </div>
   );
 }
-

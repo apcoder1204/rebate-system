@@ -107,6 +107,7 @@ export default function Dashboard() {
   };
   const userRole = user?.role || 'user';
   const isStaff = ['admin', 'manager', 'staff'].includes(userRole);
+  const isAdmin = userRole === 'admin';
 
   // Find a contract the customer can redeem (no pending request already)
   const redeemableContract = !isStaff
@@ -214,26 +215,30 @@ export default function Dashboard() {
               Current Cycle <span className="normal-case font-normal text-slate-400 dark:text-slate-500">— ends Dec 31, 2026</span>
             </h2>
           </div>
-          <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${isStaff ? 'lg:grid-cols-4' : 'lg:grid-cols-4'}`}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             <StatsCard
               title={isStaff ? "Active Contracts" : "My Contract"}
               value={stats.currentContracts}
               icon={<FileText className="w-6 h-6 text-white" />}
+              color="blue"
             />
             <StatsCard
               title="Orders This Cycle"
               value={stats.currentOrders}
               icon={<ShoppingCart className="w-6 h-6 text-white" />}
+              color="purple"
             />
             <StatsCard
               title="Amount Spent"
               value={`Tsh ${stats.currentTotalSpent.toFixed(2)}`}
               icon={<DollarSign className="w-6 h-6 text-white" />}
+              color="teal"
             />
             <StatsCard
               title="Est. Rebate"
               value={`Tsh ${stats.currentEstimatedRebate.toFixed(2)}`}
               icon={<Wallet className="w-6 h-6 text-white" />}
+              color="green"
               trend={stats.currentEstimatedRebate > 0 ? { value: 1, isPositive: true } : undefined}
             />
           </div>
@@ -247,36 +252,52 @@ export default function Dashboard() {
               Previous Cycle <span className="normal-case font-normal text-slate-400 dark:text-slate-500">— ended Jun 30, 2026</span>
             </h2>
           </div>
-          <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${isStaff ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
+          <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${
+            isAdmin
+              ? 'lg:grid-cols-5'
+              : isStaff
+              ? 'lg:grid-cols-2'
+              : 'lg:grid-cols-4'
+          }`}>
             {isStaff && (
               <StatsCard
                 title="Expired Contracts"
                 value={stats.previousContracts}
                 icon={<FileText className="w-6 h-6 text-white" />}
+                color="slate"
               />
             )}
             <StatsCard
               title="Past Orders"
               value={stats.previousOrders}
               icon={<ShoppingCart className="w-6 h-6 text-white" />}
+              color="slate"
             />
-            <StatsCard
-              title="Past Spend"
-              value={`Tsh ${stats.previousTotalSpent.toFixed(2)}`}
-              icon={<DollarSign className="w-6 h-6 text-white" />}
-            />
-            <StatsCard
-              title="Rebate Pending"
-              value={`Tsh ${stats.previousUnpaidRebate.toFixed(2)}`}
-              icon={<Wallet className="w-6 h-6 text-white" />}
-              trend={stats.previousUnpaidRebate > 0 ? { value: Math.round((stats.previousUnpaidRebate / ((stats.previousUnpaidRebate + stats.previousPaidRebate) || 1)) * 100), isPositive: false } : undefined}
-            />
-            <StatsCard
-              title="Rebate Paid"
-              value={`Tsh ${stats.previousPaidRebate.toFixed(2)}`}
-              icon={<CheckCircle className="w-6 h-6 text-white" />}
-              trend={stats.previousPaidRebate > 0 ? { value: Math.round((stats.previousPaidRebate / ((stats.previousUnpaidRebate + stats.previousPaidRebate) || 1)) * 100), isPositive: true } : undefined}
-            />
+            {/* Rebate financials — admin only */}
+            {(!isStaff || isAdmin) && (
+              <>
+                <StatsCard
+                  title="Past Spend"
+                  value={`Tsh ${stats.previousTotalSpent.toFixed(2)}`}
+                  icon={<DollarSign className="w-6 h-6 text-white" />}
+                  color="slate"
+                />
+                <StatsCard
+                  title="Rebate Pending"
+                  value={`Tsh ${stats.previousUnpaidRebate.toFixed(2)}`}
+                  icon={<Wallet className="w-6 h-6 text-white" />}
+                  color="amber"
+                  trend={stats.previousUnpaidRebate > 0 ? { value: Math.round((stats.previousUnpaidRebate / ((stats.previousUnpaidRebate + stats.previousPaidRebate) || 1)) * 100), isPositive: false } : undefined}
+                />
+                <StatsCard
+                  title="Rebate Paid"
+                  value={`Tsh ${stats.previousPaidRebate.toFixed(2)}`}
+                  icon={<CheckCircle className="w-6 h-6 text-white" />}
+                  color="green"
+                  trend={stats.previousPaidRebate > 0 ? { value: Math.round((stats.previousPaidRebate / ((stats.previousUnpaidRebate + stats.previousPaidRebate) || 1)) * 100), isPositive: true } : undefined}
+                />
+              </>
+            )}
           </div>
         </div>
 
