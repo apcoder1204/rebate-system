@@ -174,7 +174,7 @@ export default function SystemSettingsPage() {
                           {setting.key.replace(/_/g, ' ').toUpperCase()}
                         </label>
                         <p className="text-sm text-slate-500">{setting.description}</p>
-                        <p className="text-xs text-slate-400 mt-1">Last updated: {format(new Date(setting.updated_at), 'MMM d, yyyy HH:mm')}</p>
+                        <p className="text-xs text-slate-400 mt-1">Last updated: {setting.updated_at ? format(new Date(setting.updated_at), 'MMM d, yyyy HH:mm') : '—'}</p>
                       </div>
                       
                       <div className="flex items-center gap-3 w-full md:w-auto">
@@ -227,7 +227,7 @@ export default function SystemSettingsPage() {
                         {logs.map((log) => (
                           <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                             <td className="p-3 whitespace-nowrap text-slate-500 dark:text-slate-400 text-sm">
-                              {format(new Date(log.created_at), 'MMM d, yyyy HH:mm')}
+                              {log.created_at ? format(new Date(log.created_at), 'MMM d, yyyy HH:mm') : '—'}
                             </td>
                             <td className="p-3 whitespace-nowrap">
                               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
