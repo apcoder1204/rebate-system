@@ -4,9 +4,8 @@ import Redis from 'ioredis';
 const redis: Redis | null = process.env.REDIS_URL
   ? new Redis(process.env.REDIS_URL, {
       retryStrategy: (times) => Math.min(times * 100, 3000),
-      enableOfflineQueue: false,
+      enableOfflineQueue: true,
       maxRetriesPerRequest: 2,
-      lazyConnect: true,
     })
   : null;
 
