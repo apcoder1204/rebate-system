@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { User } from "@/entities/User";
 import { Contract } from "@/entities/Contract";
-import { Admin } from "@/entities/Admin";
+import { Notification } from "@/entities/Notification";
 import { Card, CardContent } from "@/Components/ui/card";
 import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
@@ -41,12 +41,12 @@ export default function MyContracts() {
         return;
       }
       setUser(currentUser);
-      const [contractResp, endDate] = await Promise.all([
+      const [contractResp, publicSettings] = await Promise.all([
         Contract.filter({ customer_id: currentUser.id }, '-created_date'),
-        Admin.getSetting('cycle_end_date'),
+        Notification.getPublicSettings(),
       ]);
       setContracts(Array.isArray(contractResp?.data) ? contractResp.data : []);
-      const end = endDate || '';
+      const end = publicSettings.cycle_end_date || '';
       setCycleEndDate(end);
       setFormData(prev => ({ ...prev, end_date: end }));
     } catch (error: any) {

@@ -39,4 +39,8 @@ export const Notification = {
       body: JSON.stringify({ endpoint }),
     });
   },
+
+  async getPublicSettings(): Promise<{ cycle_end_date: string }> {
+    return apiRequest('/notifications/public-settings');
+  },
 };
