@@ -399,3 +399,267 @@ export async function sendOrderReminderEmail(
     return { success: false, message: error.message || 'Failed to send order reminder email' };
   }
 }
+
+// ─── Swahili transactional email templates ────────────────────────────────────
+
+const swahiliBase = (title: string, bodyHtml: string, ctaUrl: string, ctaLabel: string) => `
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>${title}</title>
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Tahoma,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 0;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+      <!-- Header -->
+      <tr>
+        <td style="background:#0f172a;padding:28px 36px;">
+          <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.5px;">CCTV Point</p>
+          <p style="margin:4px 0 0;font-size:13px;color:#94a3b8;">Mfumo wa Usimamizi wa Rebate</p>
+        </td>
+      </tr>
+      <!-- Body -->
+      <tr>
+        <td style="padding:36px 36px 28px;">
+          ${bodyHtml}
+          <div style="text-align:center;margin-top:32px;">
+            <a href="${ctaUrl}" style="display:inline-block;background:#3b82f6;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;">${ctaLabel}</a>
+          </div>
+        </td>
+      </tr>
+      <!-- Footer -->
+      <tr>
+        <td style="background:#f8fafc;padding:20px 36px;border-top:1px solid #e2e8f0;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#94a3b8;">© 2026 CCTV Point · Dar es Salaam, Tanzania</p>
+          <p style="margin:4px 0 0;font-size:12px;color:#cbd5e1;">Tuma maswali kwenye: support@cctvpoint.org</p>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+
+export async function sendWelcomeEmail(email: string, fullName: string): Promise<void> {
+  if (!resend) return;
+  const firstName = fullName.split(' ')[0];
+  const frontendUrl = process.env.FRONTEND_URL || 'https://rebate.cctvpoint.org';
+  const body = `
+    <h2 style="margin:0 0 16px;font-size:24px;color:#0f172a;">Karibu, ${firstName}! 🎉</h2>
+    <p style="margin:0 0 12px;font-size:15px;color:#334155;line-height:1.6;">
+      Habari ${firstName}, <strong>karibu kwenye familia ya CCTV Point!</strong>
+    </p>
+    <p style="margin:0 0 12px;font-size:15px;color:#334155;line-height:1.6;">
+      Akaunti yako imefunguliwa. Sasa unaweza kufuatilia maagizo yako, kukusanya rebate, na kupata taarifa zote kuhusu biashara yako moja kwa moja.
+    </p>
+    <div style="background:#eff6ff;border-left:4px solid #3b82f6;padding:14px 18px;border-radius:0 8px 8px 0;margin:20px 0;">
+      <p style="margin:0;font-size:14px;color:#1e40af;font-weight:600;">Jinsi ya kuanza:</p>
+      <ul style="margin:8px 0 0;padding-left:20px;color:#1e40af;font-size:14px;line-height:1.8;">
+        <li>Ingia kwenye mfumo wako</li>
+        <li>Angalia maagizo yako ya hivi karibuni</li>
+        <li>Fuatilia rebate yako inayokua</li>
+      </ul>
+    </div>
+    <p style="margin:16px 0 0;font-size:14px;color:#64748b;">Asante kwa kuchagua CCTV Point. Tuko hapa kukusaidia!</p>`;
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: 'Karibu CCTV Point! Akaunti Yako Imefunguliwa',
+      html: swahiliBase('Karibu CCTV Point', body, `https://${frontendUrl}`, 'Ingia Sasa'),
+    });
+  } catch (err) {
+    console.error('[email] sendWelcomeEmail failed:', err);
+  }
+}
+
+export async function sendOrderCreatedEmail(
+  email: string,
+  fullName: string,
+  orderNumber: string,
+  totalAmount: number,
+  rebateAmount: number
+): Promise<void> {
+  if (!resend) return;
+  const firstName = fullName.split(' ')[0];
+  const frontendUrl = process.env.FRONTEND_URL || 'https://rebate.cctvpoint.org';
+  const body = `
+    <h2 style="margin:0 0 16px;font-size:22px;color:#0f172a;">Agizo Lako Limepokelewa</h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#334155;">Habari ${firstName}, agizo lako limefika salama na linasubiri uthibitisho.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:16px;">
+      <tr><td style="padding:18px 20px;">
+        <table width="100%">
+          <tr>
+            <td style="font-size:13px;color:#64748b;padding-bottom:8px;">Nambari ya Agizo</td>
+            <td style="font-size:13px;color:#0f172a;font-weight:700;text-align:right;padding-bottom:8px;">${orderNumber}</td>
+          </tr>
+          <tr>
+            <td style="font-size:13px;color:#64748b;padding-bottom:8px;">Jumla ya Thamani</td>
+            <td style="font-size:13px;color:#0f172a;font-weight:700;text-align:right;padding-bottom:8px;">Tsh ${totalAmount.toLocaleString('en-TZ', { minimumFractionDigits: 2 })}</td>
+          </tr>
+          <tr>
+            <td style="font-size:13px;color:#16a34a;font-weight:600;">Rebate Inayokusanyika</td>
+            <td style="font-size:13px;color:#16a34a;font-weight:700;text-align:right;">Tsh ${rebateAmount.toLocaleString('en-TZ', { minimumFractionDigits: 2 })}</td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+    <p style="margin:0;font-size:14px;color:#64748b;line-height:1.6;">Timu yetu itakagua agizo lako hivi karibuni. Utapata taarifa ukisha kuthibitishwa.</p>`;
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: `Agizo Lako Limepokelewa — ${orderNumber}`,
+      html: swahiliBase('Agizo Limepokelewa', body, `https://${frontendUrl}/my-orders`, 'Angalia Maagizo Yangu'),
+    });
+  } catch (err) {
+    console.error('[email] sendOrderCreatedEmail failed:', err);
+  }
+}
+
+export async function sendContractApprovedEmail(
+  email: string,
+  fullName: string,
+  contractNumber: string,
+  endDate: string
+): Promise<void> {
+  if (!resend) return;
+  const firstName = fullName.split(' ')[0];
+  const frontendUrl = process.env.FRONTEND_URL || 'https://rebate.cctvpoint.org';
+  const formattedEnd = new Date(endDate).toLocaleDateString('sw-TZ', { year: 'numeric', month: 'long', day: 'numeric' });
+  const body = `
+    <h2 style="margin:0 0 16px;font-size:22px;color:#0f172a;">Mkataba Wako Umeidhinishwa! ✅</h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#334155;">Hongera ${firstName}! Mkataba wako na CCTV Point umeidhinishwa rasmi.</p>
+    <div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:14px 18px;border-radius:0 8px 8px 0;margin:0 0 16px;">
+      <p style="margin:0 0 6px;font-size:13px;color:#64748b;">Nambari ya Mkataba</p>
+      <p style="margin:0;font-size:18px;font-weight:700;color:#15803d;">${contractNumber}</p>
+      <p style="margin:8px 0 0;font-size:13px;color:#64748b;">Mkataba unaisha: <strong style="color:#166534;">${formattedEnd}</strong></p>
+    </div>
+    <p style="margin:0 0 12px;font-size:15px;color:#334155;line-height:1.6;">
+      Sasa unaweza kuanza kuagiza bidhaa na kukusanya rebate yako ya <strong>1%</strong> ya kila agizo. Rebate yote itakulipwa mkataba ukiisha.
+    </p>
+    <p style="margin:0;font-size:14px;color:#64748b;">Agiza zaidi, pata zaidi — rebate yako inakua na kila nunuzi!</p>`;
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: `Mkataba Wako Umeidhinishwa — ${contractNumber}`,
+      html: swahiliBase('Mkataba Umeidhinishwa', body, `https://${frontendUrl}/my-contracts`, 'Angalia Mkataba Wangu'),
+    });
+  } catch (err) {
+    console.error('[email] sendContractApprovedEmail failed:', err);
+  }
+}
+
+export async function sendRebateReminderEmail(
+  email: string,
+  fullName: string,
+  contractNumber: string,
+  unpaidRebate: number
+): Promise<void> {
+  if (!resend) return;
+  const firstName = fullName.split(' ')[0];
+  const frontendUrl = process.env.FRONTEND_URL || 'https://rebate.cctvpoint.org';
+  const body = `
+    <h2 style="margin:0 0 16px;font-size:22px;color:#0f172a;">Rebate Yako Inakusubiri! 💰</h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#334155;">Habari ${firstName},</p>
+    <p style="margin:0 0 16px;font-size:15px;color:#334155;line-height:1.6;">
+      Mkataba wako nambari <strong>${contractNumber}</strong> umeisha na una rebate inayosubiri malipo.
+    </p>
+    <div style="background:#fefce8;border:2px solid #eab308;border-radius:8px;padding:20px;text-align:center;margin:20px 0;">
+      <p style="margin:0 0 4px;font-size:13px;color:#713f12;">Jumla ya Rebate Inayosubiri</p>
+      <p style="margin:0;font-size:32px;font-weight:800;color:#854d0e;">Tsh ${unpaidRebate.toLocaleString('en-TZ', { minimumFractionDigits: 2 })}</p>
+    </div>
+    <p style="margin:0 0 12px;font-size:15px;color:#334155;line-height:1.6;">
+      Wasiliana na timu yetu leo ili kupanga malipo yako. Usikose fedha zako!
+    </p>
+    <p style="margin:0;font-size:14px;color:#64748b;">Kama una maswali, piga simu au tuma ujumbe kwenye <a href="mailto:support@cctvpoint.org" style="color:#3b82f6;">support@cctvpoint.org</a>.</p>`;
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: `Kumbukumbu: Rebate Yako ya Tsh ${unpaidRebate.toLocaleString()} Inakusubiri`,
+      html: swahiliBase('Dai Rebate Yako', body, `https://${frontendUrl}/my-orders`, 'Angalia Maagizo Yangu'),
+    });
+  } catch (err) {
+    console.error('[email] sendRebateReminderEmail failed:', err);
+  }
+}
+
+export async function sendContractRenewalReminderEmail(
+  email: string,
+  fullName: string,
+  contractNumber: string,
+  expiryDate: string,
+  daysLeft: number
+): Promise<void> {
+  if (!resend) return;
+  const firstName = fullName.split(' ')[0];
+  const frontendUrl = process.env.FRONTEND_URL || 'https://rebate.cctvpoint.org';
+  const formattedExpiry = new Date(expiryDate).toLocaleDateString('sw-TZ', { year: 'numeric', month: 'long', day: 'numeric' });
+  const urgencyColor = daysLeft <= 7 ? '#dc2626' : '#d97706';
+  const body = `
+    <h2 style="margin:0 0 16px;font-size:22px;color:#0f172a;">Mkataba Wako Unakwisha Hivi Karibuni ⚠️</h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#334155;">Habari ${firstName},</p>
+    <p style="margin:0 0 16px;font-size:15px;color:#334155;line-height:1.6;">
+      Mkataba wako nambari <strong>${contractNumber}</strong> unakwisha hivi karibuni. Fanya upya leo ili kuendelea kukusanya rebate yako.
+    </p>
+    <div style="background:#fff7ed;border:2px solid ${urgencyColor};border-radius:8px;padding:20px;text-align:center;margin:20px 0;">
+      <p style="margin:0 0 4px;font-size:13px;color:#9a3412;">Mkataba Unaisha</p>
+      <p style="margin:0 0 4px;font-size:22px;font-weight:800;color:${urgencyColor};">${formattedExpiry}</p>
+      <p style="margin:0;font-size:13px;font-weight:600;color:${urgencyColor};">Siku ${daysLeft} zimebaki!</p>
+    </div>
+    <p style="margin:0 0 12px;font-size:15px;color:#334155;line-height:1.6;">
+      Wasiliana na timu yetu haraka ili kufanya upya mkataba wako bila kukosa muda wa kukusanya rebate.
+    </p>
+    <p style="margin:0;font-size:14px;color:#64748b;">Piga simu au tuma ujumbe: <a href="mailto:support@cctvpoint.org" style="color:#3b82f6;">support@cctvpoint.org</a></p>`;
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: `Haraka! Mkataba ${contractNumber} Unakwisha Siku ${daysLeft} Zimebaki`,
+      html: swahiliBase('Fanya Upya Mkataba', body, `https://${frontendUrl}/my-contracts`, 'Angalia Mkataba Wangu'),
+    });
+  } catch (err) {
+    console.error('[email] sendContractRenewalReminderEmail failed:', err);
+  }
+}
+
+export async function sendRebatePaidEmail(
+  email: string,
+  fullName: string,
+  contractNumber: string,
+  paidAmount: number
+): Promise<void> {
+  if (!resend) return;
+  const firstName = fullName.split(' ')[0];
+  const frontendUrl = process.env.FRONTEND_URL || 'https://rebate.cctvpoint.org';
+  const body = `
+    <h2 style="margin:0 0 16px;font-size:22px;color:#0f172a;">Rebate Yako Imelipwa! 🎊</h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#334155;">Hongera sana ${firstName}!</p>
+    <div style="background:#f0fdf4;border:2px solid #16a34a;border-radius:8px;padding:24px;text-align:center;margin:20px 0;">
+      <p style="margin:0 0 4px;font-size:13px;color:#166534;">Jumla ya Rebate Iliyolipwa</p>
+      <p style="margin:0 0 8px;font-size:36px;font-weight:800;color:#15803d;">Tsh ${paidAmount.toLocaleString('en-TZ', { minimumFractionDigits: 2 })}</p>
+      <p style="margin:0;font-size:13px;color:#16a34a;">Mkataba: ${contractNumber}</p>
+    </div>
+    <p style="margin:0 0 12px;font-size:15px;color:#334155;line-height:1.6;">
+      Timu ya CCTV Point imefanikisha malipo ya rebate yako. Asante kwa biashara yako na uaminifu wako kwetu.
+    </p>
+    <p style="margin:0 0 12px;font-size:15px;color:#334155;line-height:1.6;">
+      Endelea kufanya biashara nasi na upate nafasi ya kukusanya rebate zaidi kwenye mkataba wako mpya!
+    </p>
+    <p style="margin:0;font-size:14px;color:#64748b;">Asante kwa kuchagua CCTV Point — tunashukuru uaminifu wako. 🙏</p>`;
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: `Rebate Imelipwa — Tsh ${paidAmount.toLocaleString()} (${contractNumber})`,
+      html: swahiliBase('Rebate Imelipwa', body, `https://${frontendUrl}/my-orders`, 'Angalia Historia Yangu'),
+    });
+  } catch (err) {
+    console.error('[email] sendRebatePaidEmail failed:', err);
+  }
+}

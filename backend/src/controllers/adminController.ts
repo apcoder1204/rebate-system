@@ -5,8 +5,10 @@ import { AuditService } from '../services/auditService';
 import { AuditFormatter } from '../services/auditFormatter';
 import { CacheService } from '../services/cacheService';
 import { sendOrderReminders } from '../services/orderReminderService';
-import pool from '../db/connection';
+import { sendRebateReminderEmail, sendContractRenewalReminderEmail } from '../services/emailService';
+import pool, { readQuery } from '../db/connection';
 import { isValidUUID } from '../middleware/validation';
+import { getUserNotifPrefs } from './notificationController';
 
 // ==================== SYSTEM SETTINGS ====================
 
@@ -182,6 +184,66 @@ export const triggerOrderReminders = async (req: AuthRequest, res: Response) => 
     res.json(result);
   } catch (error) {
     console.error('Trigger order reminders error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const triggerNotificationReminders = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!['admin', 'manager'].includes(req.user!.role)) {
+      return res.status(403).json({ error: 'Admins and managers only' });
+    }
+
+    let rebateSent = 0;
+    let renewalSent = 0;
+
+    // Rebate claim reminders
+    const { rows: rebateRows } = await readQuery(`
+      SELECT DISTINCT ON (c.customer_id, c.id)
+        c.customer_id, c.contract_number, u.email, u.full_name,
+        SUM(o.rebate_amount) FILTER (WHERE o.rebate_status = 'unpaid') AS unpaid_rebate
+      FROM contracts c
+      JOIN users u ON u.id = c.customer_id
+      JOIN orders o ON o.contract_id = c.id
+      WHERE c.status = 'expired' AND o.rebate_status = 'unpaid'
+      GROUP BY c.customer_id, c.id, c.contract_number, u.email, u.full_name
+      HAVING SUM(o.rebate_amount) FILTER (WHERE o.rebate_status = 'unpaid') > 0
+    `);
+    for (const row of rebateRows) {
+      const prefs = await getUserNotifPrefs(row.customer_id);
+      if (prefs.email_notifications && prefs.contract_updates) {
+        await sendRebateReminderEmail(row.email, row.full_name, row.contract_number, parseFloat(row.unpaid_rebate));
+        rebateSent++;
+      }
+    }
+
+    // Renewal reminders (contracts expiring within 14 days)
+    const { rows: renewalRows } = await readQuery(`
+      SELECT c.customer_id, c.contract_number, c.end_date, u.email, u.full_name,
+             (c.end_date::date - CURRENT_DATE)::int AS days_left
+      FROM contracts c
+      JOIN users u ON u.id = c.customer_id
+      WHERE c.status IN ('active', 'approved')
+        AND c.end_date::date BETWEEN CURRENT_DATE AND CURRENT_DATE + 14
+    `);
+    for (const row of renewalRows) {
+      const prefs = await getUserNotifPrefs(row.customer_id);
+      if (prefs.email_notifications && prefs.contract_updates) {
+        await sendContractRenewalReminderEmail(
+          row.email, row.full_name, row.contract_number,
+          String(row.end_date), row.days_left
+        );
+        renewalSent++;
+      }
+    }
+
+    res.json({
+      message: 'Notification reminders sent',
+      rebate_reminders_sent: rebateSent,
+      renewal_reminders_sent: renewalSent,
+    });
+  } catch (error) {
+    console.error('Trigger notification reminders error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

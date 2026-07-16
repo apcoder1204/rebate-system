@@ -1,10 +1,12 @@
 import { Response } from 'express';
-import pool, { writeQuery } from '../db/connection';
+import pool, { writeQuery, readQuery } from '../db/connection';
 import { AuthRequest } from '../middleware/auth';
 import { isValidUUID } from '../middleware/validation';
 import { AuditService } from '../services/auditService';
 import { AuditFormatter } from '../services/auditFormatter';
 import { SystemSettings } from '../services/systemSettings';
+import { sendRebatePaidEmail } from '../services/emailService';
+import { getUserNotifPrefs } from './notificationController';
 
 export const getRebateCalculation = async (req: AuthRequest, res: Response) => {
   try {
@@ -181,6 +183,26 @@ export const payRebate = async (req: AuthRequest, res: Response) => {
       total_paid: totalPaid,
       order_count: order_ids.length,
       expired_contract_ids: expiredContractIds,
+    });
+
+    // Notify customer of rebate payment
+    setImmediate(async () => {
+      try {
+        const prefs = await getUserNotifPrefs(payCustomerId);
+        if (!prefs.email_notifications) return;
+        const { rows: userRows } = await readQuery(
+          'SELECT email, full_name FROM users WHERE id = $1',
+          [payCustomerId]
+        );
+        if (!userRows[0]) return;
+        // Get the contract number from the first expired contract or first order's contract
+        const { rows: cRows } = await readQuery(
+          'SELECT contract_number FROM contracts WHERE id = $1',
+          [ordersResult.rows[0].contract_id]
+        );
+        const contractNumber = cRows[0]?.contract_number ?? 'N/A';
+        await sendRebatePaidEmail(userRows[0].email, userRows[0].full_name, contractNumber, totalPaid);
+      } catch { }
     });
   } catch (error) {
     console.error('Pay rebate error:', error);
@@ -395,6 +417,25 @@ export const approveRebateRequest = async (req: AuthRequest, res: Response) => {
     }, req.ip, approveDesc);
 
     res.json({ message: 'Rebate approved and paid. Contract has been expired.' });
+
+    // Notify customer
+    setImmediate(async () => {
+      try {
+        const prefs = await getUserNotifPrefs(rebateReq.customer_id);
+        if (!prefs.email_notifications) return;
+        const { rows: userRows } = await readQuery(
+          'SELECT email, full_name FROM users WHERE id = $1',
+          [rebateReq.customer_id]
+        );
+        if (!userRows[0]) return;
+        await sendRebatePaidEmail(
+          userRows[0].email,
+          userRows[0].full_name,
+          rebateReq.contract_number,
+          parseFloat(String(rebateReq.total_rebate_amount || 0))
+        );
+      } catch { }
+    });
   } catch (error) {
     console.error('Approve rebate error:', error);
     res.status(500).json({ error: 'Internal server error' });

@@ -1,9 +1,11 @@
 import { Response } from 'express';
-import pool from '../db/connection';
+import pool, { readQuery } from '../db/connection';
 import { AuthRequest } from '../middleware/auth';
 import { isValidUUID, sanitizeString, sanitizeNumber, sanitizeSortBy, isValidDate, isValidContractStatus, sanitizePagination } from '../middleware/validation';
 import { AuditService } from '../services/auditService';
 import { AuditFormatter } from '../services/auditFormatter';
+import { sendContractApprovedEmail } from '../services/emailService';
+import { getUserNotifPrefs } from './notificationController';
 
 export const listContracts = async (req: AuthRequest, res: Response) => {
   try {
@@ -491,6 +493,28 @@ export const updateContract = async (req: AuthRequest, res: Response) => {
     );
     
     res.json(result.rows[0]);
+
+    // If contract just became active, notify the customer
+    if (status === 'active') {
+      setImmediate(async () => {
+        try {
+          const prefs = await getUserNotifPrefs(contract.customer_id);
+          if (!prefs.email_notifications || !prefs.contract_updates) return;
+          const { rows: userRows } = await readQuery(
+            'SELECT email, full_name FROM users WHERE id = $1',
+            [contract.customer_id]
+          );
+          if (!userRows[0]) return;
+          const updated = result.rows[0];
+          await sendContractApprovedEmail(
+            userRows[0].email,
+            userRows[0].full_name,
+            updated.contract_number,
+            String(updated.end_date)
+          );
+        } catch { }
+      });
+    }
   } catch (error) {
     console.error('Update contract error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -869,6 +893,25 @@ export const approveRenewal = async (req: AuthRequest, res: Response) => {
     );
 
     res.json(updateResult.rows[0]);
+
+    // Contract activated — notify customer
+    setImmediate(async () => {
+      try {
+        const prefs = await getUserNotifPrefs(contract.customer_id);
+        if (!prefs.email_notifications || !prefs.contract_updates) return;
+        const { rows: userRows } = await readQuery(
+          'SELECT email, full_name FROM users WHERE id = $1',
+          [contract.customer_id]
+        );
+        if (!userRows[0]) return;
+        await sendContractApprovedEmail(
+          userRows[0].email,
+          userRows[0].full_name,
+          contract.contract_number,
+          String(contract.end_date)
+        );
+      } catch { }
+    });
   } catch (error) {
     console.error('Approve renewal error:', error);
     res.status(500).json({ error: 'Internal server error' });

@@ -193,9 +193,14 @@ export const register = async (req: Request, res: Response) => {
         created_date: user.created_date,
       },
       role_requested: requested_role && requested_role !== 'user' ? true : false,
-      message: requested_role && requested_role !== 'user' 
-        ? 'Your account has been created. Your role request is pending approval. Please login to continue.' 
+      message: requested_role && requested_role !== 'user'
+        ? 'Your account has been created. Your role request is pending approval. Please login to continue.'
         : 'Account created successfully. Please login to continue.',
+    });
+
+    // Welcome email — fire-and-forget, never block registration response
+    setImmediate(async () => {
+      try { await emailService.sendWelcomeEmail(sanitizedEmail, sanitizedFullName); } catch { }
     });
   } catch (error) {
     console.error('Registration error:', error);

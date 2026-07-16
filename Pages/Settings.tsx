@@ -1,31 +1,44 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/Components/ui/card";
 import { Button } from "@/Components/ui/button";
 import { useTheme } from "@/Context/ThemeContext";
-import { 
-  Settings as SettingsIcon, 
-  Moon, 
-  Sun, 
-  Palette, 
-  Bell, 
-  Shield, 
+import {
+  Settings as SettingsIcon,
+  Moon,
+  Sun,
+  Palette,
+  Bell,
+  Shield,
   Globe,
   Monitor,
   Check,
   FileText,
-  ShoppingCart
+  ShoppingCart,
+  Loader2
 } from "lucide-react";
 import { useToast } from "@/Context/ToastContext";
+import { Notification, type NotificationPreferences } from "@/entities/Notification";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 export default function Settings() {
   const { theme, resolvedTheme, setTheme } = useTheme();
-  const { showSuccess } = useToast();
-  const [notifications, setNotifications] = useState({
-    email: true,
-    push: false,
-    orderUpdates: true,
-    contractUpdates: true,
+  const { showSuccess, showError } = useToast();
+  const [prefs, setPrefs] = useState<NotificationPreferences>({
+    email_notifications: true,
+    push_notifications: true,
+    order_updates: true,
+    contract_updates: true,
   });
+  const [prefsLoading, setPrefsLoading] = useState(true);
+
+  usePushNotifications(prefs.push_notifications && !prefsLoading);
+
+  useEffect(() => {
+    Notification.getPreferences()
+      .then(setPrefs)
+      .catch(() => {})
+      .finally(() => setPrefsLoading(false));
+  }, []);
 
   const handleThemeChange = (newTheme: "light" | "dark" | "system") => {
     setTheme(newTheme);
@@ -37,12 +50,17 @@ export default function Settings() {
     }
   };
 
-  const handleNotificationChange = (key: string) => {
-    setNotifications((prev) => ({
-      ...prev,
-      [key]: !prev[key as keyof typeof prev],
-    }));
-    showSuccess("Notification preferences updated");
+  const handleNotificationChange = async (key: keyof NotificationPreferences) => {
+    const prev = prefs;
+    const updated = { ...prefs, [key]: !prefs[key] };
+    setPrefs(updated); // optimistic
+    try {
+      await Notification.updatePreferences(updated);
+      showSuccess("Preference saved");
+    } catch {
+      setPrefs(prev); // revert
+      showError("Failed to save preference. Please try again.");
+    }
   };
 
   return (
@@ -160,103 +178,45 @@ export default function Settings() {
             </div>
           </CardHeader>
           <CardContent className="pt-6">
+            {prefsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+              </div>
+            ) : (
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20">
-                    <Bell className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              {([
+                { key: 'email_notifications' as const, label: 'Email Notifications', desc: 'Receive updates via email', icon: Bell, color: 'blue' },
+                { key: 'push_notifications' as const, label: 'Push Notifications', desc: 'Get instant browser notifications', icon: Bell, color: 'purple' },
+                { key: 'order_updates' as const, label: 'Order Updates', desc: 'Notifications about your orders', icon: ShoppingCart, color: 'amber' },
+                { key: 'contract_updates' as const, label: 'Contract Updates', desc: 'Notifications about your contracts', icon: FileText, color: 'green' },
+              ]).map(({ key, label, desc, icon: Icon, color }) => (
+                <div key={key} className="flex items-center justify-between p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg bg-${color}-50 dark:bg-${color}-900/20`}>
+                      <Icon className={`w-4 h-4 text-${color}-600 dark:text-${color}-400`} />
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-900 dark:text-slate-100">{label}</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">{desc}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-slate-900 dark:text-slate-100">Email Notifications</p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Receive updates via email</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleNotificationChange("email")}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    notifications.email ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      notifications.email ? "translate-x-6" : "translate-x-0"
+                  <button
+                    onClick={() => handleNotificationChange(key)}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      prefs[key] ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"
                     }`}
-                  />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-900/20">
-                    <Bell className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-900 dark:text-slate-100">Push Notifications</p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Get instant browser notifications</p>
-                  </div>
+                    aria-label={`Toggle ${label}`}
+                  >
+                    <span
+                      className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                        prefs[key] ? "translate-x-6" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleNotificationChange("push")}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    notifications.push ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      notifications.push ? "translate-x-6" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20">
-                    <ShoppingCart className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-900 dark:text-slate-100">Order Updates</p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Notifications about your orders</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleNotificationChange("orderUpdates")}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    notifications.orderUpdates ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      notifications.orderUpdates ? "translate-x-6" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-green-50 dark:bg-green-900/20">
-                    <FileText className="w-4 h-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-900 dark:text-slate-100">Contract Updates</p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Notifications about your contracts</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleNotificationChange("contractUpdates")}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    notifications.contractUpdates ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      notifications.contractUpdates ? "translate-x-6" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
+              ))}
             </div>
+            )}
           </CardContent>
         </Card>
 

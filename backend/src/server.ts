@@ -7,7 +7,9 @@ import cron from 'node-cron';
 import routes from './routes';
 import { securityHeaders, apiRateLimit } from './middleware/security';
 import { sendOrderReminders } from './services/orderReminderService';
-import pool from './db/connection';
+import pool, { readQuery } from './db/connection';
+import { sendRebateReminderEmail, sendContractRenewalReminderEmail } from './services/emailService';
+import { getUserNotifPrefs } from './controllers/notificationController';
 
 dotenv.config();
 
@@ -157,5 +159,65 @@ app.listen(PORT, () => {
   });
 
   console.log('📋 Daily contract expiry scheduler initialized (runs at midnight)');
+
+  // Every Monday 9:00 AM EAT — rebate claim reminder for expired contracts with unpaid rebate
+  cron.schedule('0 9 * * 1', async () => {
+    console.log('💰 Running rebate claim reminder job...');
+    try {
+      const { rows } = await readQuery(`
+        SELECT DISTINCT ON (c.customer_id, c.id)
+          c.customer_id, c.contract_number, u.email, u.full_name,
+          SUM(o.rebate_amount) FILTER (WHERE o.rebate_status = 'unpaid') AS unpaid_rebate
+        FROM contracts c
+        JOIN users u ON u.id = c.customer_id
+        JOIN orders o ON o.contract_id = c.id
+        WHERE c.status = 'expired' AND o.rebate_status = 'unpaid'
+        GROUP BY c.customer_id, c.id, c.contract_number, u.email, u.full_name
+        HAVING SUM(o.rebate_amount) FILTER (WHERE o.rebate_status = 'unpaid') > 0
+      `);
+      let sent = 0;
+      for (const row of rows) {
+        const prefs = await getUserNotifPrefs(row.customer_id);
+        if (prefs.email_notifications && prefs.contract_updates) {
+          await sendRebateReminderEmail(row.email, row.full_name, row.contract_number, parseFloat(row.unpaid_rebate));
+          sent++;
+        }
+      }
+      console.log(`💰 Rebate reminder job: ${sent} email(s) sent`);
+    } catch (error) {
+      console.error('❌ Error in rebate reminder job:', error);
+    }
+  }, { scheduled: true, timezone: 'Africa/Dar_es_Salaam' });
+
+  // Every Monday 9:00 AM EAT — contract renewal reminder for contracts expiring within 14 days
+  cron.schedule('0 9 * * 1', async () => {
+    console.log('📋 Running contract renewal reminder job...');
+    try {
+      const { rows } = await readQuery(`
+        SELECT c.customer_id, c.contract_number, c.end_date, u.email, u.full_name,
+               (c.end_date::date - CURRENT_DATE)::int AS days_left
+        FROM contracts c
+        JOIN users u ON u.id = c.customer_id
+        WHERE c.status IN ('active', 'approved')
+          AND c.end_date::date BETWEEN CURRENT_DATE AND CURRENT_DATE + 14
+      `);
+      let sent = 0;
+      for (const row of rows) {
+        const prefs = await getUserNotifPrefs(row.customer_id);
+        if (prefs.email_notifications && prefs.contract_updates) {
+          await sendContractRenewalReminderEmail(
+            row.email, row.full_name, row.contract_number,
+            String(row.end_date), row.days_left
+          );
+          sent++;
+        }
+      }
+      console.log(`📋 Renewal reminder job: ${sent} email(s) sent`);
+    } catch (error) {
+      console.error('❌ Error in renewal reminder job:', error);
+    }
+  }, { scheduled: true, timezone: 'Africa/Dar_es_Salaam' });
+
+  console.log('💰 Notification reminder schedulers initialized (run every Monday at 9:00 AM)');
 });
 

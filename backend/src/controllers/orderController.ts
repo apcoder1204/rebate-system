@@ -1,6 +1,9 @@
 import { Response } from 'express';
 import pool, { readQuery } from '../db/connection';
 import { AuthRequest } from '../middleware/auth';
+import { sendOrderCreatedEmail } from '../services/emailService';
+import { sendPushToUser } from '../services/pushService';
+import { getUserNotifPrefs } from './notificationController';
 import { isValidUUID, sanitizeString, sanitizeNumber, sanitizeSortBy, isValidDate, isValidOrderStatus, sanitizePagination } from '../middleware/validation';
 
 import { SystemSettings } from '../services/systemSettings';
@@ -301,6 +304,33 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       res.status(201).json({
         ...order,
         items: itemsResult.rows,
+      });
+
+      // Fire-and-forget notifications — never block the HTTP response
+      setImmediate(async () => {
+        try {
+          const prefs = await getUserNotifPrefs(customer_id);
+          const { rows: userRows } = await readQuery(
+            'SELECT email, full_name FROM users WHERE id = $1',
+            [customer_id]
+          );
+          if (!userRows[0]) return;
+          const { email, full_name } = userRows[0];
+          const total = parseFloat(String(order.total_amount || 0));
+          const rebate = parseFloat(String(order.rebate_amount || 0));
+
+          if (prefs.push_notifications && prefs.order_updates) {
+            await sendPushToUser(
+              customer_id,
+              'Agizo Jipya Limepokelewa',
+              `${order.order_number} — Tsh ${total.toLocaleString('en-TZ', { minimumFractionDigits: 2 })}`,
+              '/my-orders'
+            );
+          }
+          if (prefs.email_notifications && prefs.order_updates) {
+            await sendOrderCreatedEmail(email, full_name, order.order_number, total, rebate);
+          }
+        } catch { /* notification failure must never surface */ }
       });
     } catch (error) {
       await client.query('ROLLBACK');
