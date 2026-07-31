@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +30,9 @@ export default function ManagerApprovalDialog({
   currentUser,
 }: ManagerApprovalDialogProps) {
   const { showSuccess, showError, showWarning } = useToast();
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+
   const [managerName, setManagerName] = useState(currentUser?.full_name || "");
   const [managerPosition, setManagerPosition] = useState("Director / Manager");
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
@@ -79,8 +82,7 @@ export default function ManagerApprovalDialog({
     } catch (error) {
       console.error("Error approving contract:", error);
       showError("Failed to approve contract. Please try again.");
-    } finally {
-      setApproving(false);
+      if (mountedRef.current) setApproving(false);
     }
   };
 
@@ -104,9 +106,11 @@ export default function ManagerApprovalDialog({
       console.error("Error rejecting contract:", error);
       showError("Failed to reject contract. Please try again.");
     } finally {
-      setRejecting(false);
-      setShowRejectDialog(false);
-      setRejectionReason("");
+      if (mountedRef.current) {
+        setRejecting(false);
+        setShowRejectDialog(false);
+        setRejectionReason("");
+      }
     }
   };
 

@@ -40,7 +40,7 @@ export const Notification = {
     });
   },
 
-  async getPublicSettings(): Promise<{ cycle_end_date: string }> {
+  async getPublicSettings(): Promise<{ cycle_end_date: string; auto_lock_days: string }> {
     return apiRequest('/notifications/public-settings');
   },
 };

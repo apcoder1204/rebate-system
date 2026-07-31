@@ -101,6 +101,10 @@ export const Contract = {
     const response = await apiRequest(`/contracts${query}`);
     return normalizeContractResponse(response, page, pageSize);
   },
+  async get(id: string): Promise<ContractType> {
+    return apiRequest(`/contracts/${id}`);
+  },
+
   async create(data: Partial<ContractType>): Promise<ContractType> {
     return apiRequest('/contracts', {
       method: 'POST',

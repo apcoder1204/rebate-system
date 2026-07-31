@@ -8,7 +8,7 @@ import routes from './routes';
 import { securityHeaders, apiRateLimit } from './middleware/security';
 import { sendOrderReminders } from './services/orderReminderService';
 import pool, { readQuery } from './db/connection';
-import { sendRebateReminderEmail, sendContractRenewalReminderEmail } from './services/emailService';
+import { sendRebateReminderEmail, sendContractRenewalReminderEmail, cleanupExpiredCodes } from './services/emailService';
 import { getUserNotifPrefs } from './controllers/notificationController';
 
 dotenv.config();
@@ -159,6 +159,15 @@ app.listen(PORT, () => {
   });
 
   console.log('📋 Daily contract expiry scheduler initialized (runs at midnight)');
+
+  // Daily 2 AM — clean up expired/used verification codes
+  cron.schedule('0 2 * * *', async () => {
+    try {
+      await cleanupExpiredCodes();
+    } catch (error) {
+      console.error('❌ Error in verification code cleanup job:', error);
+    }
+  }, { scheduled: true, timezone: 'Africa/Dar_es_Salaam' });
 
   // Every Monday 9:00 AM EAT — rebate claim reminder for expired contracts with unpaid rebate
   cron.schedule('0 9 * * 1', async () => {

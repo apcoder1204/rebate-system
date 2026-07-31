@@ -100,14 +100,12 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
   };
 
   const handleViewDetails = async (contract: any) => {
-    try {
-      const resp = await Contract.list('-created_date');
-      const latest = (resp?.data || []).find((c: any) => c.id === contract.id);
-      setSelectedContract(latest || contract);
-    } catch {
-      setSelectedContract(contract);
-    }
+    setSelectedContract(contract);
     setShowPreviewDialog(true);
+    // Refresh with latest data from server in background
+    Contract.get(contract.id)
+      .then((latest) => setSelectedContract(latest))
+      .catch(() => {}); // keep the already-set contract on failure
   };
 
   const handleDelete = async (contractId: string) => {

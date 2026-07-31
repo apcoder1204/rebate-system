@@ -29,10 +29,12 @@ export default function ManageContracts() {
   const [totalPages, setTotalPages] = useState(0);
   const navigate = useNavigate();
 
-  const loadContracts = useCallback(async (currentPage?: number, currentPageSize?: number) => {
+  // Stable ref for loadContracts — does not depend on page/pageSize state
+  // because callers always pass explicit args
+  const loadContracts = useCallback(async (pg: number, ps: number) => {
     try {
       setError(null);
-      const response = await Contract.list('-created_date', undefined, currentPage || page, currentPageSize || pageSize);
+      const response = await Contract.list('-created_date', undefined, pg, ps);
       setContracts(response.data);
       setTotal(response.pagination.total);
       setTotalPages(response.pagination.totalPages);
@@ -43,7 +45,7 @@ export default function ManageContracts() {
       setError(errorMessage);
       console.error("Error loading contracts:", error);
     }
-  }, [page, pageSize]);
+  }, []); // intentionally no dependencies — always called with explicit args
 
   const loadData = useCallback(async () => {
     try {
@@ -56,11 +58,12 @@ export default function ManageContracts() {
         return;
       }
       setCurrentUserRole(userRole);
-      const allUsersResponse = await User.list();
+      const [allUsersResponse] = await Promise.all([
+        User.list(),
+        loadContracts(1, 50),
+      ]);
       const customerUsers = allUsersResponse.data.filter(u => !['admin', 'manager', 'staff'].includes(u.role || 'user'));
-      
       setCustomers(customerUsers);
-      await loadContracts(page, pageSize);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to load data';
       setError(errorMessage);
@@ -69,15 +72,12 @@ export default function ManageContracts() {
     } finally {
       setLoading(false);
     }
-  }, [navigate, page, pageSize, loadContracts]);
+  }, [navigate, loadContracts]);
 
+  // Single effect — runs once on mount
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  useEffect(() => {
-    loadContracts(page, pageSize);
-  }, [page, pageSize, loadContracts]);
 
   if (loading) {
     return (

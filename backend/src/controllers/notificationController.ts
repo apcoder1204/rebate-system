@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { readQuery, writeQuery } from '../db/connection';
 import { AuthRequest } from '../middleware/auth';
+import { SystemSettings } from '../services/systemSettings';
 
 const DEFAULTS = {
   email_notifications: true,
@@ -99,4 +100,17 @@ export const getVapidPublicKey = (_req: Request, res: Response) => {
   const key = process.env.VAPID_PUBLIC_KEY;
   if (!key) return res.status(503).json({ error: 'Push notifications not configured' });
   res.json({ publicKey: key });
+};
+
+// Public settings any authenticated user can read (customers need cycle_end_date, auto_lock_days)
+export const getPublicSettings = async (_req: Request, res: Response) => {
+  try {
+    const [cycleEndDate, autoLockDays] = await Promise.all([
+      SystemSettings.get('cycle_end_date', '2026-12-31'),
+      SystemSettings.get('auto_lock_days', '3'),
+    ]);
+    res.json({ cycle_end_date: cycleEndDate, auto_lock_days: autoLockDays });
+  } catch {
+    res.json({ cycle_end_date: '2026-12-31', auto_lock_days: '3' });
+  }
 };

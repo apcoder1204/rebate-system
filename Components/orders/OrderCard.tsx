@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Order } from "@/entities/Order";
-import { Admin } from "@/entities/Admin";
+import { Notification } from "@/entities/Notification";
 import { Card, CardContent } from "@/Components/ui/card";
 import { Badge } from "@/Components/ui/badge";
 import { Button } from "@/Components/ui/button";
@@ -22,23 +22,14 @@ export default function OrderCard({ order, onRefresh }: OrderCardProps) {
   const [showComment, setShowComment] = useState(false);
   const [autoLockDays, setAutoLockDays] = useState<number>(3); // Default to 3 days
 
-  // Fetch auto-lock days setting
+  // Fetch auto-lock days from the public settings endpoint (accessible by all roles)
   useEffect(() => {
-    const fetchAutoLockDays = async () => {
-      try {
-        const settingValue = await Admin.getSetting('auto_lock_days');
-        if (settingValue) {
-          const days = parseInt(settingValue, 10);
-          if (!isNaN(days) && days > 0) {
-            setAutoLockDays(days);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching auto_lock_days setting:', error);
-        // Keep default value of 3
-      }
-    };
-    fetchAutoLockDays();
+    Notification.getPublicSettings()
+      .then(({ auto_lock_days }) => {
+        const days = parseInt(auto_lock_days, 10);
+        if (!isNaN(days) && days > 0) setAutoLockDays(days);
+      })
+      .catch(() => {}); // keep default 3
   }, []);
 
   // Calculate days since order creation and lock status using configured auto_lock_days
