@@ -289,7 +289,7 @@ export const createContract = async (req: AuthRequest, res: Response) => {
     if (customer_signature_data_url !== undefined && typeof customer_signature_data_url !== 'string') {
       return res.status(400).json({ error: 'Invalid signature data URL format' });
     }
-    if (customer_signature_data_url && customer_signature_data_url.length > 100000) {
+    if (customer_signature_data_url && customer_signature_data_url.length > 500000) {
       return res.status(400).json({ error: 'Signature data URL too long' });
     }
     
@@ -406,7 +406,7 @@ export const updateContract = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Signature data URL too long' });
     }
     
-    if (manager_signature_data_url !== undefined && typeof manager_signature_data_url === 'string' && manager_signature_data_url.length > 100000) {
+    if (manager_signature_data_url !== undefined && typeof manager_signature_data_url === 'string' && manager_signature_data_url.length > 500000) {
       return res.status(400).json({ error: 'Manager signature data URL too long' });
     }
     

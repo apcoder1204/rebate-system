@@ -6,11 +6,13 @@ import {
   savePushSubscription,
   removePushSubscription,
   getVapidPublicKey,
+  getPublicSettings,
 } from '../controllers/notificationController';
 
 const router = Router();
 
 router.get('/vapid-public-key', authenticate, getVapidPublicKey);
+router.get('/public-settings', authenticate, getPublicSettings);
 router.get('/preferences', authenticate, getPreferences);
 router.put('/preferences', authenticate, updatePreferences);
 router.post('/push-subscription', authenticate, savePushSubscription);

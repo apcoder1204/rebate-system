@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
+import ReactDOM from "react-dom";
 import { Toast, ToastType } from "@/Components/ui/toast";
 import { ToastComponent } from "@/Components/ui/toast";
 
@@ -62,19 +63,24 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     [showToast]
   );
 
+  // Render toast container via portal to document.body so it escapes all stacking contexts
+  const toastContainer = ReactDOM.createPortal(
+    <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2.5 items-end pointer-events-none">
+      {toasts.map((toast) => (
+        <div key={toast.id} className="pointer-events-auto">
+          <ToastComponent toast={toast} onClose={removeToast} />
+        </div>
+      ))}
+    </div>,
+    document.body
+  );
+
   return (
     <ToastContext.Provider
       value={{ showToast, showSuccess, showError, showWarning, showInfo }}
     >
       {children}
-      {/* Toast container — top-right */}
-      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2.5 items-end pointer-events-none">
-        {toasts.map((toast) => (
-          <div key={toast.id} className="pointer-events-auto">
-            <ToastComponent toast={toast} onClose={removeToast} />
-          </div>
-        ))}
-      </div>
+      {toastContainer}
     </ToastContext.Provider>
   );
 }

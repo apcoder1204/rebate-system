@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { User } from "@/entities/User";
-import { useNavigate, Link, useLocation } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { routes } from "@/utils";
 import cctvpointLogo from '../cctvpointLogo.png';
 import { useToast } from "@/Context/ToastContext";
@@ -9,7 +9,6 @@ import { Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { resetActivityTimer } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -62,29 +61,12 @@ export default function LoginPage() {
       }
       
       showSuccess("Login successful! Welcome back.");
-      
+
       // Reset activity timer
       resetActivityTimer();
-      
-      // Clear browser history to prevent back navigation
-      // Defensive check for mobile browsers
-      try {
-        window.history.replaceState(null, "", routes.Dashboard);
-      } catch (err) {
-        console.warn('History replaceState failed:', err);
-      }
-      
-      // Navigate and prevent back button
+
+      // Navigate (replace so the login page is not in browser history)
       navigate(routes.Dashboard, { replace: true });
-      
-      // Push state again to prevent back navigation
-      setTimeout(() => {
-        try {
-          window.history.pushState(null, "", routes.Dashboard);
-        } catch (err) {
-          console.warn('History pushState failed:', err);
-        }
-      }, 100);
     } catch (error: any) {
       console.error('Login error:', error);
       // Show more detailed error message

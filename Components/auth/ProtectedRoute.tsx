@@ -11,39 +11,32 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const location = useLocation();
-  const { checkSession, logout } = useSession();
+  const { logout } = useSession();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const verifyAuth = async () => {
       try {
-        const authenticated = await checkSession();
-        setIsAuthenticated(authenticated);
-
-        if (authenticated) {
-          try {
-            const currentUser = await User.me();
-            setUser(currentUser);
-
-            // Check role requirement
-            if (requiredRole && requiredRole.length > 0) {
-              const userRole = currentUser.role || "user";
-              if (!requiredRole.includes(userRole)) {
-                // User doesn't have required role
-                await logout();
-                setIsAuthenticated(false);
-              }
-            }
-          } catch (error) {
-            setIsAuthenticated(false);
-            await logout();
-          }
-        } else {
+        const token = localStorage.getItem("rebate_token");
+        if (!token) {
+          setIsAuthenticated(false);
           await logout();
+          return;
         }
-      } catch (error) {
+
+        // Single User.me() call — validates token and fetches role in one request
+        const currentUser = await User.me();
+        if (requiredRole && requiredRole.length > 0) {
+          const userRole = currentUser.role || "user";
+          if (!requiredRole.includes(userRole)) {
+            await logout();
+            setIsAuthenticated(false);
+            return;
+          }
+        }
+        setIsAuthenticated(true);
+      } catch {
         setIsAuthenticated(false);
         await logout();
       } finally {
@@ -52,7 +45,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
     };
 
     verifyAuth();
-  }, [location.pathname, checkSession, logout, requiredRole]);
+  }, [location.pathname, logout, requiredRole]);
 
   // Prevent back navigation for protected routes
   useEffect(() => {

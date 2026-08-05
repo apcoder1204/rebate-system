@@ -34,18 +34,19 @@ export default function ManageOrders() {
   const [totalPages, setTotalPages] = useState(0);
   const navigate = useNavigate();
 
-  const loadOrders = useCallback(async (customerId?: string, status?: string, currentPage?: number, currentPageSize?: number) => {
+  // Always called with explicit args — no closure over page/pageSize state
+  const loadOrders = useCallback(async (customerId: string, status: string, pg: number, ps: number) => {
     try {
       setError(null);
       const filters: OrderFilters = {};
       if (customerId && customerId !== 'all') filters.customer_id = customerId;
       if (status && status !== 'all') filters.customer_status = status;
 
-      const response = await Order.filter(filters, '-order_date', currentPage || page, currentPageSize || pageSize);
+      const response = await Order.filter(filters, '-order_date', pg, ps);
       const data = Array.isArray(response?.data) ? response.data : [];
       const pagination = response?.pagination || {
-        page: currentPage || page,
-        pageSize: currentPageSize || pageSize,
+        page: pg,
+        pageSize: ps,
         total: data.length,
         totalPages: data.length === 0 ? 0 : 1,
       };
@@ -60,7 +61,7 @@ export default function ManageOrders() {
       setError(errorMessage);
       console.error('Error loading orders:', err);
     }
-  }, [page, pageSize]);
+  }, []); // intentionally no dependencies — always called with explicit args
 
   const loadData = useCallback(async () => {
     try {
@@ -68,7 +69,7 @@ export default function ManageOrders() {
       setLoading(true);
       const user = await User.me();
       const userRole = user.role || 'user';
-      
+
       if (!['admin', 'manager', 'staff'].includes(userRole)) {
         navigate(createPageUrl('Dashboard'));
         return;
@@ -77,12 +78,12 @@ export default function ManageOrders() {
       setCurrentUserId(user.id);
 
       // Fetch ALL contracts/users (backend is paginated: default 20, max 100)
-      const pageSize = 100;
+      const batchSize = 100;
 
       const allContracts: any[] = [];
       let contractsPage = 1;
       while (true) {
-        const contractsResponse = await Contract.list(undefined, { includeAll: true }, contractsPage, pageSize);
+        const contractsResponse = await Contract.list(undefined, { includeAll: true }, contractsPage, batchSize);
         allContracts.push(...(contractsResponse.data || []));
         if (!contractsResponse.pagination || contractsPage >= contractsResponse.pagination.totalPages) break;
         contractsPage++;
@@ -91,17 +92,17 @@ export default function ManageOrders() {
       const allUsers: any[] = [];
       let usersPage = 1;
       while (true) {
-        const usersResponse = await User.list(undefined, usersPage, pageSize);
+        const usersResponse = await User.list(undefined, usersPage, batchSize);
         allUsers.push(...(usersResponse.data || []));
         if (!usersResponse.pagination || usersPage >= usersResponse.pagination.totalPages) break;
         usersPage++;
       }
-      const customerUsers = allUsers.filter(u => !['admin', 'manager', 'staff'].includes(u.role || 'user')); 
-      
+      const customerUsers = allUsers.filter(u => !['admin', 'manager', 'staff'].includes(u.role || 'user'));
+
       setContracts(allContracts as never[]);
       setCustomers(customerUsers as never[]);
 
-      await loadOrders(filterCustomerId, filterStatus);
+      await loadOrders('all', 'all', 1, 20);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to load data';
       setError(errorMessage);
@@ -110,16 +111,12 @@ export default function ManageOrders() {
     } finally {
       setLoading(false);
     }
-  }, [filterCustomerId, filterStatus, loadOrders, navigate]);
+  }, [loadOrders, navigate]);
 
+  // Single effect — runs once on mount
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  useEffect(() => {
-    // Refresh orders when filters or pagination change
-    loadOrders(filterCustomerId, filterStatus, page, pageSize);
-  }, [filterCustomerId, filterStatus, page, pageSize, loadOrders]);
 
   const handleEdit = (order: any) => {
     const isOwner = order.created_by === currentUserId;
@@ -250,7 +247,11 @@ export default function ManageOrders() {
                 </label>
                 <CustomerCombobox
                   value={filterCustomerId}
-                  onChange={setFilterCustomerId}
+                  onChange={(val) => {
+                    setFilterCustomerId(val);
+                    setPage(1);
+                    loadOrders(val, filterStatus, 1, pageSize);
+                  }}
                   placeholder="All customers"
                   includeAll={true}
                 />
@@ -268,7 +269,11 @@ export default function ManageOrders() {
                     { value: "disputed", label: "Disputed" }
                   ]}
                   value={filterStatus}
-                  onChange={setFilterStatus}
+                  onChange={(val) => {
+                    setFilterStatus(val);
+                    setPage(1);
+                    loadOrders(filterCustomerId, val, 1, pageSize);
+                  }}
                   placeholder="All statuses"
                 />
               </div>
