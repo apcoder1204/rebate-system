@@ -12,8 +12,11 @@ import { Card } from "@/Components/ui/card";
 import ContractsList from "@/Components/staff/ContractsList";
 import CreateContractDialog from "@/Components/staff/CreateContractDialog";
 import RebatePaymentDialog from "@/Components/staff/RebatePaymentDialog";
+import { useToast } from "@/Context/ToastContext";
+import { ConfirmDialog } from "@/Components/ui/confirm-dialog";
 
 export default function ManageContracts() {
+  const { showSuccess, showError, showWarning } = useToast();
   const [contracts, setContracts] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -27,6 +30,10 @@ export default function ManageContracts() {
   const [pageSize, setPageSize] = useState(50);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean; title: string; message: string; onConfirm: () => void;
+  }>({ open: false, title: "", message: "", onConfirm: () => {} });
+  const closeConfirm = () => setConfirmDialog((prev) => ({ ...prev, open: false }));
   const navigate = useNavigate();
 
   // Stable ref for loadContracts — does not depend on page/pageSize state
@@ -88,6 +95,7 @@ export default function ManageContracts() {
   }
 
   return (
+    <>
     <div className="min-h-screen p-6 md:p-8 bg-slate-50 dark:bg-slate-900">
       <div className="max-w-7xl mx-auto space-y-8">
         {error && (
@@ -112,23 +120,29 @@ export default function ManageContracts() {
             {['admin', 'manager'].includes(currentUserRole || '') && (
               <Button
                 variant="outline"
-                onClick={async () => {
+                onClick={() => {
                   const activeCount = contracts.filter(c => ['active', 'approved'].includes(c.status)).length;
                   if (activeCount === 0) {
-                    alert('No active contracts to expire.');
+                    showWarning('No active contracts to expire.');
                     return;
                   }
-                  if (window.confirm(`END PROGRAM CYCLE\n\nThis will immediately expire all ${activeCount} active contract(s). This action cannot be undone.\n\nAre you sure you want to end the cycle now?`)) {
-                    try {
-                      const result = await Contract.bulkExpire();
-                      alert(result.message);
-                      setPage(1);
-                      loadContracts(1, pageSize);
-                    } catch (error) {
-                      console.error('Bulk expire failed:', error);
-                      alert('Failed to end cycle. Please try again.');
-                    }
-                  }
+                  setConfirmDialog({
+                    open: true,
+                    title: "End Program Cycle",
+                    message: `This will immediately expire all ${activeCount} active contract(s). This action cannot be undone.\n\nAre you sure you want to end the cycle now?`,
+                    onConfirm: async () => {
+                      closeConfirm();
+                      try {
+                        const result = await Contract.bulkExpire();
+                        showSuccess(result.message || `${activeCount} contract(s) expired successfully.`);
+                        setPage(1);
+                        loadContracts(1, pageSize);
+                      } catch (error) {
+                        console.error('Bulk expire failed:', error);
+                        showError('Failed to end cycle. Please try again.');
+                      }
+                    },
+                  });
                 }}
                 className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
               >
@@ -151,7 +165,7 @@ export default function ManageContracts() {
                   document.body.removeChild(a);
                 } catch (error) {
                   console.error('Export failed:', error);
-                  alert('Failed to export contracts. Please try again.');
+                  showError('Failed to export contracts. Please try again.');
                 }
               }}
             >
@@ -232,5 +246,15 @@ export default function ManageContracts() {
         )}
       </div>
     </div>
+    <ConfirmDialog
+      open={confirmDialog.open}
+      title={confirmDialog.title}
+      message={confirmDialog.message}
+      confirmLabel="End Cycle"
+      variant="danger"
+      onConfirm={confirmDialog.onConfirm}
+      onCancel={closeConfirm}
+    />
+    </>
   );
 }

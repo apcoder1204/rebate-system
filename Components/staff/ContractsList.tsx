@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { ContractPreviewDialog, ManagerApprovalDialog } from "@/Components/contracts";
 import { User as UserEntity } from "@/entities/User";
 import { useToast } from "@/Context/ToastContext";
+import { ConfirmDialog } from "@/Components/ui/confirm-dialog";
 
 interface ContractsListProps {
   contracts: any[];
@@ -30,6 +31,11 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
   const [approvalContract, setApprovalContract] = useState<any>(null);
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean; title: string; message: string; confirmLabel: string;
+    variant: "danger" | "warning"; onConfirm: () => void;
+  }>({ open: false, title: "", message: "", confirmLabel: "Confirm", variant: "danger", onConfirm: () => {} });
+  const closeConfirm = () => setConfirmDialog((prev) => ({ ...prev, open: false }));
   const canApprove = ['admin', 'manager', 'staff'].includes(currentUserRole || '');
   const canModify = ['admin', 'manager'].includes(currentUserRole || '');
   const canPayRebate = ['admin', 'manager', 'staff'].includes(currentUserRole || '');
@@ -108,41 +114,65 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
       .catch(() => {}); // keep the already-set contract on failure
   };
 
-  const handleDelete = async (contractId: string) => {
+  const handleDelete = (contractId: string) => {
     if (currentUserRole !== 'admin') { showWarning("Only admins can delete contracts."); return; }
-    if (window.confirm("Are you sure you want to delete this contract?")) {
-      try {
-        await Contract.delete(contractId);
-        showSuccess("Contract deleted successfully.");
-        onRefresh();
-      } catch (error) {
-        showError("Failed to delete contract. Please try again.");
-      }
-    }
+    setConfirmDialog({
+      open: true,
+      title: "Delete Contract",
+      message: "Are you sure you want to delete this contract? This action cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "danger",
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          await Contract.delete(contractId);
+          showSuccess("Contract deleted successfully.");
+          onRefresh();
+        } catch (error) {
+          showError("Failed to delete contract. Please try again.");
+        }
+      },
+    });
   };
 
-  const handleRenew = async (contract: any) => {
-    if (window.confirm(`Renew contract ${contract.contract_number} for ${contract.customer_name}?\n\nA new contract will be created carrying forward all signatures, valid until the program cycle end date (December 31, 2026). You can then approve it with one click.`)) {
-      try {
-        await Contract.renew(contract.id);
-        showSuccess(`Renewal created for ${contract.customer_name}. Use "Approve Renewal" to activate it.`);
-        onRefresh();
-      } catch (error: any) {
-        showError(error?.message || "Failed to renew contract.");
-      }
-    }
+  const handleRenew = (contract: any) => {
+    setConfirmDialog({
+      open: true,
+      title: `Renew Contract ${contract.contract_number}`,
+      message: `Renew contract for ${contract.customer_name}?\n\nA new contract will be created carrying forward all signatures, valid until the program cycle end date (December 31, 2026). You can then approve it with one click.`,
+      confirmLabel: "Renew",
+      variant: "warning",
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          await Contract.renew(contract.id);
+          showSuccess(`Renewal created for ${contract.customer_name}. Use "Approve Renewal" to activate it.`);
+          onRefresh();
+        } catch (error: any) {
+          showError(error?.message || "Failed to renew contract.");
+        }
+      },
+    });
   };
 
-  const handleApproveRenewal = async (contract: any) => {
-    if (window.confirm(`Approve renewal ${contract.contract_number} for ${contract.customer_name}?\n\nThis activates the contract immediately. No new signature is required.`)) {
-      try {
-        await Contract.approveRenewal(contract.id);
-        showSuccess(`Renewal ${contract.contract_number} is now active.`);
-        onRefresh();
-      } catch (error: any) {
-        showError(error?.message || "Failed to approve renewal.");
-      }
-    }
+  const handleApproveRenewal = (contract: any) => {
+    setConfirmDialog({
+      open: true,
+      title: `Approve Renewal ${contract.contract_number}`,
+      message: `Approve renewal for ${contract.customer_name}?\n\nThis activates the contract immediately. No new signature is required.`,
+      confirmLabel: "Approve",
+      variant: "warning",
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          await Contract.approveRenewal(contract.id);
+          showSuccess(`Renewal ${contract.contract_number} is now active.`);
+          onRefresh();
+        } catch (error: any) {
+          showError(error?.message || "Failed to approve renewal.");
+        }
+      },
+    });
   };
 
   const TabBtn = ({ value, label, count }: { value: typeof tab; label: string; count: number }) => (
@@ -362,6 +392,16 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
           currentUser={currentUser}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmLabel={confirmDialog.confirmLabel}
+        variant={confirmDialog.variant}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={closeConfirm}
+      />
     </>
   );
 }

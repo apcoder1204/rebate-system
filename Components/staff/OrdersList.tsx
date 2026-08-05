@@ -7,6 +7,7 @@ import { Badge } from "@/Components/ui/badge";
 import { Search, Edit, Trash2, ShoppingCart, Calendar, DollarSign, Package, Eye, Lock, Unlock, AlertCircle, Download } from "lucide-react";
 import { format, addMonths, isAfter, differenceInDays } from "date-fns";
 import { useToast } from "@/Context/ToastContext";
+import { ConfirmDialog } from "@/Components/ui/confirm-dialog";
 import jsPDF from "jspdf";
 
 interface OrdersListProps {
@@ -24,6 +25,10 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
   const { showSuccess, showError, showWarning } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [tab, setTab] = useState<'current' | 'previous' | 'all'>('all');
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean; title: string; message: string; onConfirm: () => void;
+  }>({ open: false, title: "", message: "", onConfirm: () => {} });
+  const closeConfirm = () => setConfirmDialog((prev) => ({ ...prev, open: false }));
   const safeOrders = Array.isArray(orders) ? orders : [];
 
   const currentCount = safeOrders.filter(o => CURRENT_CONTRACT_STATUSES.includes(o.contract_status)).length;
@@ -89,21 +94,27 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
     return matchesTab && matchesSearch;
   });
 
-  const handleDelete = async (orderId: string) => {
+  const handleDelete = (orderId: string) => {
     if (currentUserRole !== 'admin') {
       showWarning("Only admins can delete orders.");
       return;
     }
-    if (window.confirm("Are you sure you want to delete this order?")) {
-      try {
-        await Order.delete(orderId);
-        showSuccess("Order deleted successfully.");
-        onRefresh();
-      } catch (error) {
-        console.error("Error deleting order:", error);
-        showError("Failed to delete order. Please try again.");
-      }
-    }
+    setConfirmDialog({
+      open: true,
+      title: "Delete Order",
+      message: "Are you sure you want to delete this order? This action cannot be undone.",
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          await Order.delete(orderId);
+          showSuccess("Order deleted successfully.");
+          onRefresh();
+        } catch (error) {
+          console.error("Error deleting order:", error);
+          showError("Failed to delete order. Please try again.");
+        }
+      },
+    });
   };
 
   const handleView = (order: any) => {
@@ -184,6 +195,7 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
   );
 
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex flex-col gap-4">
@@ -350,5 +362,15 @@ export default function OrdersList({ orders, onRefresh, onEdit, canEdit, current
         )}
       </CardContent>
     </Card>
+    <ConfirmDialog
+      open={confirmDialog.open}
+      title={confirmDialog.title}
+      message={confirmDialog.message}
+      confirmLabel="Delete"
+      variant="danger"
+      onConfirm={confirmDialog.onConfirm}
+      onCancel={closeConfirm}
+    />
+    </>
   );
 }

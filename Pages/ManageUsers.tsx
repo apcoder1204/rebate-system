@@ -22,6 +22,7 @@ import { format } from "date-fns";
 import { createPageUrl } from "@/utils";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/Context/ToastContext";
+import { ConfirmDialog } from "@/Components/ui/confirm-dialog";
 
 export default function ManageUsers() {
   const { showSuccess, showError, showWarning } = useToast();
@@ -35,6 +36,10 @@ export default function ManageUsers() {
   const [error, setError] = useState<string | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [togglingActive, setTogglingActive] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean; title: string; message: string; onConfirm: () => void;
+  }>({ open: false, title: "", message: "", onConfirm: () => {} });
+  const closeConfirm = () => setConfirmDialog((prev) => ({ ...prev, open: false }));
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
@@ -199,18 +204,25 @@ export default function ManageUsers() {
       return;
     }
 
-    const confirmed = window.confirm('Are you sure you want to delete this user? This action cannot be undone.');
-    if (!confirmed) return;
-
-    setDeletingUserId(userId);
-    setError(null);
-    try {
-      await User.delete(userId);
-      await loadData();
-    } catch (error: any) {
-      setError(error.message || 'Failed to delete user');
-    }
-    setDeletingUserId(null);
+    setConfirmDialog({
+      open: true,
+      title: "Delete User",
+      message: "Are you sure you want to delete this user? This action cannot be undone.",
+      onConfirm: async () => {
+        closeConfirm();
+        setDeletingUserId(userId);
+        setError(null);
+        try {
+          await User.delete(userId);
+          showSuccess("User deleted successfully.");
+          await loadData();
+        } catch (error: any) {
+          setError(error.message || 'Failed to delete user');
+          showError(error.message || 'Failed to delete user');
+        }
+        setDeletingUserId(null);
+      },
+    });
   };
 
   const handleToggleActive = async (userId: string, currentStatus: boolean) => {
@@ -272,6 +284,7 @@ export default function ManageUsers() {
   }
 
   return (
+    <>
     <div className="min-h-screen p-6 md:p-8 bg-slate-50 dark:bg-slate-900">
       <div className="max-w-7xl mx-auto space-y-8">
         <div>
@@ -655,5 +668,15 @@ export default function ManageUsers() {
         )}
       </div>
     </div>
+    <ConfirmDialog
+      open={confirmDialog.open}
+      title={confirmDialog.title}
+      message={confirmDialog.message}
+      confirmLabel="Delete"
+      variant="danger"
+      onConfirm={confirmDialog.onConfirm}
+      onCancel={closeConfirm}
+    />
+    </>
   );
 }

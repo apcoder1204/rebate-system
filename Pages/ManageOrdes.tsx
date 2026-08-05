@@ -14,8 +14,10 @@ import { Card, CardContent } from "@/Components/ui/card";
 import OrdersList from "@/Components/staff/OrdersList";
 import CreateOrderDialog from "@/Components/staff/CreateOrderDialog";
 import ViewOrderDialog from "@/Components/staff/ViewOrderDialog";
+import { useToast } from "@/Context/ToastContext";
 
 export default function ManageOrders() {
+  const { showError } = useToast();
   const [orders, setOrders] = useState([]);
   const [contracts, setContracts] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -312,7 +314,7 @@ export default function ManageOrders() {
                       document.body.removeChild(a);
                     } catch (error) {
                       console.error('Export failed:', error);
-                      alert('Failed to export orders. Please try again.');
+                      showError('Failed to export orders. Please try again.');
                     }
                   }}
                 >
