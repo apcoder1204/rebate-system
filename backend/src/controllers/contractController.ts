@@ -140,9 +140,21 @@ export const listContracts = async (req: AuthRequest, res: Response) => {
     
     // Get paginated results
     const result = await pool.query(query, params);
-    
+
+    // Opt-in (?without_signatures=true): drop the base64 signature images, which make
+    // up ~97% of the response (~1.9 MB for all contracts). Staff list pages only need the
+    // flags; the preview/approval dialogs fetch the full contract via GET /contracts/:id.
+    // Without the parameter the response is unchanged.
+    const rows = req.query.without_signatures === 'true'
+      ? result.rows.map(({ customer_signature_data_url, manager_signature_data_url, ...rest }: any) => ({
+          ...rest,
+          has_customer_signature: !!customer_signature_data_url,
+          has_manager_signature: !!manager_signature_data_url,
+        }))
+      : result.rows;
+
     res.json({
-      data: result.rows,
+      data: rows,
       pagination: {
         page,
         pageSize: limit,

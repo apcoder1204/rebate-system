@@ -41,7 +41,7 @@ export default function ManageContracts() {
   const loadContracts = useCallback(async (pg: number, ps: number) => {
     try {
       setError(null);
-      const response = await Contract.list('-created_date', undefined, pg, ps);
+      const response = await Contract.list('-created_date', { withoutSignatures: true }, pg, ps);
       setContracts(response.data);
       setTotal(response.pagination.total);
       setTotalPages(response.pagination.totalPages);

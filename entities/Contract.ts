@@ -91,10 +91,12 @@ function normalizeContractResponse(
 }
 
 export const Contract = {
-  async list(sortBy?: string, options?: { includeAll?: boolean }, page?: number, pageSize?: number): Promise<PaginatedResponse<ContractType>> {
+  // withoutSignatures: skip the large signature images (use get(id) when they are needed)
+  async list(sortBy?: string, options?: { includeAll?: boolean; withoutSignatures?: boolean }, page?: number, pageSize?: number): Promise<PaginatedResponse<ContractType>> {
     const params = new URLSearchParams();
     if (sortBy) params.append('sortBy', sortBy);
     if (options?.includeAll) params.append('include_all', 'true');
+    if (options?.withoutSignatures) params.append('without_signatures', 'true');
     if (page) params.append('page', String(page));
     if (pageSize) params.append('pageSize', String(pageSize));
     const query = params.toString() ? `?${params.toString()}` : '';

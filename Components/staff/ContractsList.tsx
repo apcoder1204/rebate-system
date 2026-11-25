@@ -86,8 +86,14 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
     }
   };
 
-  const handleApprove = (contract: any) => {
-    setApprovalContract(contract);
+  const handleApprove = async (contract: any) => {
+    // The list is loaded without signature images; fetch the full contract so the
+    // approval preview shows the customer's signature. Fall back to the list row.
+    let full = contract;
+    try {
+      full = await Contract.get(contract.id);
+    } catch {}
+    setApprovalContract(full);
     setShowApprovalDialog(true);
   };
 
@@ -98,8 +104,7 @@ export default function ContractsList({ contracts, onRefresh, onEdit, currentUse
     await onRefresh();
     if (selectedContract && selectedContract.id === approvedContractId) {
       try {
-        const resp = await Contract.list('-created_date');
-        const updated = (resp?.data || []).find((c: any) => c.id === approvedContractId);
+        const updated = await Contract.get(approvedContractId);
         if (updated) setSelectedContract(updated);
       } catch {}
     }

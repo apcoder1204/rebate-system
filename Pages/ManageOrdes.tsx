@@ -86,7 +86,7 @@ export default function ManageOrders() {
         const allContracts: any[] = [];
         let contractsPage = 1;
         while (true) {
-          const contractsResponse = await Contract.list(undefined, { includeAll: true }, contractsPage, batchSize);
+          const contractsResponse = await Contract.list(undefined, { includeAll: true, withoutSignatures: true }, contractsPage, batchSize);
           allContracts.push(...(contractsResponse.data || []));
           if (!contractsResponse.pagination || contractsPage >= contractsResponse.pagination.totalPages) break;
           contractsPage++;
