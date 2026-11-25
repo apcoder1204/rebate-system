@@ -1,6 +1,6 @@
 import express from 'express';
 import { authenticate } from '../middleware/auth';
-import { getSettings, updateSetting, getAuditLogs, toggleUserActive, triggerOrderReminders, triggerNotificationReminders } from '../controllers/adminController';
+import { getSettings, updateSetting, getAuditLogs, toggleUserActive, triggerOrderReminders, triggerNotificationReminders, getSystemHealth } from '../controllers/adminController';
 import { getRevenueReport, getOrderTrends, getCustomerStats, getSummaryStats } from '../controllers/reportController';
 
 const router = express.Router();
@@ -11,6 +11,9 @@ router.put('/settings', authenticate, updateSetting);
 
 // Audit Logs
 router.get('/logs', authenticate, getAuditLogs);
+
+// System Health (DB primary/backup status, Redis, backup file info)
+router.get('/system-health', authenticate, getSystemHealth);
 
 // User Management Extension
 router.put('/users/:id/active', authenticate, toggleUserActive);

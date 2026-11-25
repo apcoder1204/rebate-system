@@ -42,7 +42,7 @@ export const authRateLimit = rateLimit({
   store: makeRedisStore('rl:auth:'),
   keyGenerator: (req: Request) => {
     const email = typeof req.body?.email === 'string' ? req.body.email.toLowerCase() : '';
-    const ip = ipKeyGenerator(req as any);
+    const ip = ipKeyGenerator(req.ip ?? '');
     return `${ip}:${email}`;
   },
   skip: (req) => process.env.NODE_ENV !== 'production' && req.ip === '::1',
@@ -72,7 +72,7 @@ export const apiRateLimit = rateLimit({
         // fall through to IP
       }
     }
-    return ipKeyGenerator(req as any);
+    return ipKeyGenerator(req.ip ?? '');
   },
   skipSuccessfulRequests: false,
 });

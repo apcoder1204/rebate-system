@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { primaryPool, backupPool } from './connection';
+import { primaryPool, backupPool, primaryShortName, backupDisplayName } from './connection';
 import { Pool } from 'pg';
 
 // Function to run all migration files from migrations directory
@@ -38,26 +38,26 @@ async function migrate() {
     const schemaPath = path.join(__dirname, 'schema.sql');
     const schema = fs.readFileSync(schemaPath, 'utf8');
     
-    // Migrate primary database (Neon)
+    // Migrate primary database
     try {
-      console.log('🔄 Running base schema migration on Primary (Neon)...');
+      console.log(`🔄 Running base schema migration on Primary (${primaryShortName})...`);
       await primaryPool.query(schema);
       console.log('✅ Base schema applied to Primary.');
-      
+
       // Run additional migrations
-      await runMigrations(primaryPool, 'Primary (Neon)');
+      await runMigrations(primaryPool, `Primary (${primaryShortName})`);
     } catch (error: any) {
       console.error('❌ Primary database migration failed:', error.message);
     }
-    
-    // Migrate backup database (localhost)
+
+    // Migrate backup database
     try {
-      console.log('🔄 Running base schema migration on Backup (Localhost)...');
+      console.log(`🔄 Running base schema migration on Backup (${backupDisplayName})...`);
       await backupPool!.query(schema);
       console.log('✅ Base schema applied to Backup.');
-      
+
       // Run additional migrations
-      await runMigrations(backupPool!, 'Backup (Localhost)');
+      await runMigrations(backupPool!, `Backup (${backupDisplayName})`);
     } catch (error: any) {
       console.error('⚠️  Backup database migration failed:', error.message);
     }

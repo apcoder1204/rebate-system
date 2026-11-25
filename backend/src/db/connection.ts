@@ -7,6 +7,16 @@ dotenv.config();
 // Remove or set to false when ready to push changes to production Neon DB.
 const DEV_LOCAL_ONLY = process.env.DEV_LOCAL_ONLY === 'true';
 
+// LOCAL_IS_PRIMARY=true → local Postgres is authoritative (primary) and Neon
+// is the mirrored backup, instead of the default (Neon primary, local backup).
+// Has no effect when DEV_LOCAL_ONLY=true (local is already the only target).
+const LOCAL_IS_PRIMARY = process.env.LOCAL_IS_PRIMARY === 'true';
+
+// Short display names used in log messages below, reflecting whichever
+// database is actually acting as primary/backup in this deployment.
+const primaryShortName = (DEV_LOCAL_ONLY || LOCAL_IS_PRIMARY) ? 'Local' : 'Neon';
+const backupDisplayName = LOCAL_IS_PRIMARY ? 'Neon' : 'localhost';
+
 const localConfig = {
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '5432'),
@@ -29,34 +39,41 @@ function ensurePoolerConfig(connectionString: string): string {
   return connectionString;
 }
 
-// Primary pool: localhost in dev mode, Neon in production
-const primaryPool = DEV_LOCAL_ONLY
-  ? new Pool(localConfig)
-  : new Pool({
-      connectionString: ensurePoolerConfig(
-        process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || ''
-      ),
-      max: 10,
-      idleTimeoutMillis: 60000,
-      connectionTimeoutMillis: 15000,
-      keepAlive: true,
-      keepAliveInitialDelayMillis: 5000,
-      ssl: { rejectUnauthorized: false },
-      allowExitOnIdle: false,
-    });
+// Neon pool config, reused for whichever role (primary or backup) Neon plays.
+const neonPoolConfig = {
+  connectionString: ensurePoolerConfig(
+    process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || ''
+  ),
+  max: 10,
+  idleTimeoutMillis: 60000,
+  connectionTimeoutMillis: 15000,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 5000,
+  ssl: { rejectUnauthorized: false },
+  allowExitOnIdle: false,
+};
 
-// Backup pool: only used in production mode (localhost mirror)
+// Primary pool: local in dev mode or when LOCAL_IS_PRIMARY=true, Neon otherwise.
+const primaryPool = (DEV_LOCAL_ONLY || LOCAL_IS_PRIMARY)
+  ? new Pool(localConfig)
+  : new Pool(neonPoolConfig);
+
+// Backup pool: none in pure dev mode; otherwise whichever of Neon/local isn't primary.
 const backupPool = DEV_LOCAL_ONLY
-  ? null  // no backup needed when primary IS localhost
-  : new Pool(localConfig);
+  ? null
+  : LOCAL_IS_PRIMARY
+    ? new Pool(neonPoolConfig)
+    : new Pool(localConfig);
 
 if (DEV_LOCAL_ONLY) {
   console.log('🔧 DEV_LOCAL_ONLY mode — all queries routed to localhost, Neon untouched');
+} else if (LOCAL_IS_PRIMARY) {
+  console.log('🔁 LOCAL_IS_PRIMARY mode — local Postgres is primary, Neon is the mirrored backup');
 }
 
 // Error handlers with retry logic
 primaryPool.on('error', (err) => {
-  console.error(`❌ ${DEV_LOCAL_ONLY ? 'Local' : 'Neon'} database error:`, err.message);
+  console.error(`❌ ${primaryShortName} database error:`, err.message);
   // Log connection state for debugging
   console.error('Pool stats:', {
     totalCount: primaryPool.totalCount,
@@ -92,7 +109,7 @@ primaryPool.on('connect', (client) => {
 
 // Handle connection removal (disconnections)
 primaryPool.on('remove', (client) => {
-  console.warn('⚠️  Neon connection removed from pool');
+  console.warn(`⚠️  ${primaryShortName} connection removed from pool`);
 });
 
 // Handle connection acquire (when getting a connection)
@@ -102,7 +119,7 @@ primaryPool.on('acquire', () => {
 
 if (backupPool) {
   backupPool.on('error', (err) => {
-    console.error('❌ Backup database (localhost) error:', err.message);
+    console.error(`❌ Backup database (${backupDisplayName}) error:`, err.message);
     if (err instanceof Error) err.name = 'HandledPoolError';
   });
   backupPool.on('connect', (client) => {
@@ -137,10 +154,12 @@ async function testConnectionWithRetry(
 }
 
 async function testConnections() {
-  const primaryName = DEV_LOCAL_ONLY ? 'Local database (dev)' : 'Primary database (Neon)';
+  const primaryName = DEV_LOCAL_ONLY
+    ? 'Local database (dev)'
+    : `Primary database (${primaryShortName})`;
   await testConnectionWithRetry(primaryPool, primaryName, 3, 2000);
   if (backupPool) {
-    await testConnectionWithRetry(backupPool, 'Backup database (localhost)', 3, 1000);
+    await testConnectionWithRetry(backupPool, `Backup database (${backupDisplayName})`, 3, 1000);
   }
 }
 
@@ -163,7 +182,7 @@ function startHealthCheck(intervalSeconds: number = 60) {
     try {
       await primaryPool.query('SELECT 1');
     } catch (error: any) {
-      console.warn(`⚠️  ${DEV_LOCAL_ONLY ? 'Local' : 'Neon'} health check failed:`, error.message);
+      console.warn(`⚠️  ${primaryShortName} health check failed:`, error.message);
       // Try to reconnect immediately
       await reconnectPrimary();
     }
@@ -209,7 +228,7 @@ async function reconnectPrimary(maxRetries: number = 3): Promise<boolean> {
       const client = await primaryPool.connect();
       await client.query('SELECT 1');
       client.release();
-      console.log(`✅ Neon reconnected${attempt > 1 ? ` (after ${attempt} attempts)` : ''}`);
+      console.log(`✅ ${primaryShortName} reconnected${attempt > 1 ? ` (after ${attempt} attempts)` : ''}`);
       return true;
     } catch (error: any) {
       console.error(`⚠️  Reconnection attempt ${attempt}/${maxRetries} failed:`, error?.message || '(no message)');
@@ -362,7 +381,7 @@ export async function readQuery(queryText: string, params?: any[]): Promise<any>
     return await primaryPool.query(queryText, params);
   } catch (error: any) {
     if (isTransientConnectionError(error)) {
-      console.warn('⚠️  Neon connection dropped, reconnecting...');
+      console.warn(`⚠️  ${primaryShortName} connection dropped, reconnecting...`);
       const reconnected = await reconnectPrimary(3);
       if (reconnected) {
         try {
@@ -372,7 +391,7 @@ export async function readQuery(queryText: string, params?: any[]): Promise<any>
           console.error('❌ Still failing after reconnect, using backup DB');
         }
       } else {
-        console.error('❌ Neon reconnect failed, using backup DB');
+        console.error(`❌ ${primaryShortName} reconnect failed, using backup DB`);
       }
       if (backupPool) {
         try {
@@ -457,7 +476,7 @@ export async function dualTransaction<T>(
 }
 
 // Export pools for direct access if needed
-export { primaryPool, backupPool };
+export { primaryPool, backupPool, primaryShortName, backupDisplayName };
 
 // Default export: routes reads/writes appropriately
 const defaultPool = {

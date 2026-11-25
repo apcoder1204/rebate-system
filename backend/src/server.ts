@@ -14,7 +14,11 @@ import { getUserNotifPrefs } from './controllers/notificationController';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+// Trust only local reverse proxies (Nginx/cloudflared on the same host) so req.ip
+// is the real client IP from X-Forwarded-For; a client can't spoof it past them.
+app.set('trust proxy', 'loopback');
+const PORT = parseInt(process.env.PORT || '3000', 10);
+const BIND_HOST = process.env.BIND_HOST || '0.0.0.0';
 
 // Security middleware (must be first)
 app.use(securityHeaders);
@@ -115,7 +119,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, BIND_HOST, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   

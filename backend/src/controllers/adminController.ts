@@ -6,9 +6,78 @@ import { AuditFormatter } from '../services/auditFormatter';
 import { CacheService } from '../services/cacheService';
 import { sendOrderReminders } from '../services/orderReminderService';
 import { sendRebateReminderEmail, sendContractRenewalReminderEmail } from '../services/emailService';
-import pool, { readQuery } from '../db/connection';
+import pool, { readQuery, primaryPool, backupPool, primaryShortName, backupDisplayName } from '../db/connection';
 import { isValidUUID } from '../middleware/validation';
 import { getUserNotifPrefs } from './notificationController';
+import redis from '../db/redis';
+import fs from 'fs';
+import path from 'path';
+
+// ==================== SYSTEM HEALTH ====================
+
+async function checkPool(p: any, label: string) {
+  const start = Date.now();
+  try {
+    await p.query('SELECT 1');
+    return { label, connected: true, latencyMs: Date.now() - start };
+  } catch (error: any) {
+    return { label, connected: false, latencyMs: Date.now() - start, error: error.message || String(error) };
+  }
+}
+
+async function checkRedis() {
+  if (!redis) return { connected: false, error: 'REDIS_URL not configured' };
+  const start = Date.now();
+  try {
+    await redis.ping();
+    return { connected: true, latencyMs: Date.now() - start };
+  } catch (error: any) {
+    return { connected: false, latencyMs: Date.now() - start, error: error.message || String(error) };
+  }
+}
+
+function getLatestBackup() {
+  const backupDir = process.env.BACKUP_DIR || '/app/backups';
+  try {
+    if (!fs.existsSync(backupDir)) return null;
+    const files = fs.readdirSync(backupDir)
+      .filter((f) => f.startsWith('rebate_system_') && f.endsWith('.dump'))
+      .map((f) => {
+        const stat = fs.statSync(path.join(backupDir, f));
+        return { file: f, sizeBytes: stat.size, modifiedAt: stat.mtime };
+      })
+      .sort((a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime());
+    return files[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+export const getSystemHealth = async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user!.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can view system health' });
+    }
+
+    const [primary, backup, redisStatus] = await Promise.all([
+      checkPool(primaryPool, `Primary (${primaryShortName})`),
+      backupPool ? checkPool(backupPool, `Backup (${backupDisplayName})`) : Promise.resolve(null),
+      checkRedis(),
+    ]);
+
+    res.json({
+      primaryDatabase: primary,
+      backupDatabase: backup,
+      redis: redisStatus,
+      latestBackupFile: getLatestBackup(),
+      serverUptimeSeconds: Math.floor(process.uptime()),
+      checkedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Get system health error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 // ==================== SYSTEM SETTINGS ====================
 
