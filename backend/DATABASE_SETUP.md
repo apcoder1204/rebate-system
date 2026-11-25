@@ -41,11 +41,11 @@ Never commit real credentials. The production values live only in `/var/www/reba
 - The primary is the source of truth. If the write to the backup fails, a warning is logged and the primary write stands.
 - If the primary has a dropped connection, the code reconnects and retries once before it gives up.
 
-> **Known gaps: the backup is not a complete mirror.**
+> **Known gaps: live mirroring is incomplete.**
 > - `pool.connect()` returns a **primary-only** client. Transactions run on it (`createOrder`, `updateOrder`, role-request review) never reach the backup. `dualTransaction` has the same problem: its callback only receives the primary client.
 > - Mirrored inserts that rely on `DEFAULT gen_random_uuid()` get a **different id in each database**, so later `UPDATE`/`DELETE ... WHERE id = …` statements miss those rows on the backup.
 >
-> Treat the backup as incomplete. For a complete copy, use `pg_dump` (see below and [DEPLOYMENT.md](../DEPLOYMENT.md#known-gap-neon-is-not-a-complete-mirror)).
+> In production, `backend/scripts/sync_to_neon.sh` repairs this with a full, verified copy to Neon every 8 hours, so Neon is at most 8 hours behind. See [DEPLOYMENT.md](../DEPLOYMENT.md#full-copy-to-neon-every-8-hours).
 
 ### Read operations
 - Reads go to the primary.
