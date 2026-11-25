@@ -8,6 +8,29 @@ import { isValidUUID, sanitizeString, sanitizeNumber, sanitizeSortBy, isValidDat
 
 import { SystemSettings } from '../services/systemSettings';
 
+// Pending orders older than `auto_lock_days` get locked when orders are read.
+// The UPDATE is a write, so it also waits on the backup DB (Neon) — slow, and it
+// wakes Neon on every page view even though it almost never changes a row.
+// Check the primary first (fast, read-only) and only run the UPDATE when a row
+// actually qualifies. The UPDATE and its conditions are unchanged.
+const AUTO_LOCK_CONDITIONS = `
+        customer_status = 'pending'
+        AND order_date < NOW() - ($1 || ' days')::INTERVAL
+        AND is_locked = FALSE
+        AND manually_unlocked = FALSE`;
+
+async function autoLockStaleOrders(autoLockDays: number, orderId?: string): Promise<void> {
+  const params: unknown[] = [autoLockDays];
+  let where = AUTO_LOCK_CONDITIONS;
+  if (orderId) {
+    params.push(orderId);
+    where += ` AND id = $2`;
+  }
+  const due = await readQuery(`SELECT EXISTS (SELECT 1 FROM orders WHERE ${where}) AS due`, params);
+  if (!due.rows[0]?.due) return;
+  await pool.query(`UPDATE orders SET is_locked = TRUE, locked_date = NOW() WHERE ${where}`, params);
+}
+
 export const listOrders = async (req: AuthRequest, res: Response) => {
   try {
     const sortBy = sanitizeSortBy(
@@ -25,16 +48,8 @@ export const listOrders = async (req: AuthRequest, res: Response) => {
     // Get auto-lock days from settings
     const autoLockDays = await SystemSettings.getNumber('auto_lock_days', 3);
     
-    // Check for auto-locking orders before listing
-    // Use dynamic interval based on settings
-    await pool.query(`
-      UPDATE orders
-      SET is_locked = TRUE, locked_date = NOW()
-      WHERE customer_status = 'pending'
-        AND order_date < NOW() - ($1 || ' days')::INTERVAL
-        AND is_locked = FALSE
-        AND manually_unlocked = FALSE
-    `, [autoLockDays]);
+    // Auto-lock stale pending orders before listing (only touches the DB for writes when needed)
+    await autoLockStaleOrders(autoLockDays);
 
     // Build base query for counting
     let countQuery = `
@@ -127,16 +142,8 @@ export const getOrder = async (req: AuthRequest, res: Response) => {
     // Get auto-lock days from settings
     const autoLockDays = await SystemSettings.getNumber('auto_lock_days', 3);
 
-    // Check for auto-locking this specific order
-    await pool.query(`
-      UPDATE orders
-      SET is_locked = TRUE, locked_date = NOW()
-      WHERE id = $1
-        AND customer_status = 'pending'
-        AND order_date < NOW() - ($2 || ' days')::INTERVAL
-        AND is_locked = FALSE
-        AND manually_unlocked = FALSE
-    `, [id, autoLockDays]);
+    // Auto-lock this specific order if it is stale
+    await autoLockStaleOrders(autoLockDays, id);
     
     const result = await pool.query(
       `SELECT 
@@ -647,15 +654,8 @@ export const filterOrders = async (req: AuthRequest, res: Response) => {
     // Get auto-lock days from settings
     const autoLockDays = await SystemSettings.getNumber('auto_lock_days', 3);
     
-    // Check for auto-locking orders before filtering
-    await pool.query(`
-      UPDATE orders
-      SET is_locked = TRUE, locked_date = NOW()
-      WHERE customer_status = 'pending'
-        AND order_date < NOW() - ($1 || ' days')::INTERVAL
-        AND is_locked = FALSE
-        AND manually_unlocked = FALSE
-    `, [autoLockDays]);
+    // Auto-lock stale pending orders before filtering (only touches the DB for writes when needed)
+    await autoLockStaleOrders(autoLockDays);
 
     // Build base query for counting
     let countQuery = `

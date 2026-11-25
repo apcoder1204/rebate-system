@@ -9,7 +9,7 @@ Current production setup (since 2026-11-25):
 | **Public entry** | Cloudflare Tunnel → Nginx (port 80) → container on `127.0.0.1:3000` |
 | **Primary database** | PostgreSQL on the same Ubuntu server (db `rebate_system`, role `rebate_app`) |
 | **Backup database** | Neon (cloud PostgreSQL). Gets most writes live, plus a **full verified copy every 8 hours** (01:30 / 09:30 / 17:30 UTC) that fills the gaps. See [§6](#full-copy-to-neon-every-8-hours) |
-| **Cache / rate limits** | Upstash Redis |
+| **Cache / rate limits** | Redis container on the same server (`127.0.0.1:6380`). Upstash was replaced 2026-11-25: each call took ~270 ms (Cape Town) vs under 1 ms locally |
 | **Email** | Resend |
 | **File backups** | Daily `pg_dump` of the primary at 04:00 UTC, kept 30 days |
 
@@ -53,12 +53,31 @@ services:
   backend:
     build: .
     env_file: .env
-    network_mode: host          # reach the host's Postgres, which only listens on localhost
+    # host network: reach the host Postgres, which only listens on localhost
+    network_mode: host
     volumes:
       - ./uploads:/app/uploads
       - /home/cctvpoint/backups/rebate:/app/backups:ro
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # Local Redis for rate limits and short-lived caches. Only reachable from this server.
+  # Holds nothing permanent (60 s caches, rate-limit counters), so no persistence.
+  redis:
+    image: redis:7-alpine
+    command:
+      - sh
+      - -c
+      - exec redis-server --requirepass "$$REDIS_PASSWORD" --maxmemory 64mb --maxmemory-policy allkeys-lru --save "" --appendonly no
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    ports:
+      - "127.0.0.1:6380:6379"
     restart: unless-stopped
 ```
+
+To rebuild only the backend, run `docker compose up -d --build backend`. Restarting Redis clears the rate-limit counters and caches. That's harmless.
 
 `network_mode: host` is deliberate. The shared Postgres only listens on `localhost`, and opening it to Docker's network would mean restarting Postgres, which would interrupt dukani-pos. So that the app is not exposed on the server's other addresses, `.env` sets `BIND_HOST=127.0.0.1`.
 
@@ -79,7 +98,8 @@ These go in `/var/www/rebate-backend/.env` on the server:
 | `DB_HOST` / `DB_PORT` | `127.0.0.1` / `5432` | Local Postgres |
 | `DB_NAME` / `DB_USER` / `DB_PASSWORD` | `rebate_system` / `rebate_app` / *(secret)* | Local Postgres credentials |
 | `NEON_DATABASE_URL` | `postgresql://...-pooler...` | Neon. **Use the pooled URL.** |
-| `REDIS_URL` | `rediss://...` | Upstash |
+| `REDIS_URL` | `redis://:<REDIS_PASSWORD>@127.0.0.1:6380` | Local Redis container. The old Upstash URL is kept commented out in `.env` for rollback |
+| `REDIS_PASSWORD` | *(secret, generated)* | Password of the local Redis. Docker Compose also reads it to start the `redis` service |
 | `JWT_SECRET`, `JWT_EXPIRES_IN` | *(secret)*, `7d` | Auth tokens |
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `APP_NAME` | | Email |
 | `FRONTEND_URL` | `rebate.cctvpoint.org` | Extra CORS origin |
@@ -100,7 +120,7 @@ rsync -az --exclude node_modules --exclude .git --exclude dist \
   backend/ cctvpoint@<server>:/var/www/rebate-backend/
 
 # 2. Rebuild and restart the container
-ssh cctvpoint@<server> "cd /var/www/rebate-backend && docker compose up -d --build"
+ssh cctvpoint@<server> "cd /var/www/rebate-backend && docker compose up -d --build backend"
 ```
 
 > **Do not add `--delete` to rsync.** `docker-compose.yml` and `.env` exist only on the server, and `--delete` would remove them. (`scripts/` now comes from `backend/scripts/` in the repo, so edit the scripts here and deploy them with the rsync above.)
@@ -189,7 +209,7 @@ The Render service `rebate-api` ran the backend before this migration. It may st
 
 - Its code still treats **Neon as primary** and writes to it directly. Any request that reaches Render's own `*.onrender.com` URL writes to Neon **without** going through the local primary, so the two databases drift apart.
 - Pushes to `main` may still trigger Render auto-deploys.
-- It shares the same Upstash Redis.
+- It still uses the old Upstash Redis (the new server no longer does).
 
 Once you have confirmed the new server over a few days of real use, **suspend and then delete the Render service**.
 

@@ -9,11 +9,19 @@ import { getUserNotifPrefs } from './notificationController';
 
 export const listContracts = async (req: AuthRequest, res: Response) => {
   try {
-    // Auto-expire contracts whose end_date has passed (same pattern as order auto-lock)
-    await pool.query(
-      `UPDATE contracts SET status = 'expired'
-       WHERE end_date < CURRENT_DATE AND status IN ('active', 'approved')`
+    // Auto-expire contracts whose end_date has passed (same pattern as order auto-lock).
+    // Check the primary first: the UPDATE also waits on the backup DB (Neon), and it
+    // almost never has a row to change, so only run it when one qualifies.
+    const expiryDue = await readQuery(
+      `SELECT EXISTS (SELECT 1 FROM contracts
+         WHERE end_date < CURRENT_DATE AND status IN ('active', 'approved')) AS due`
     );
+    if (expiryDue.rows[0]?.due) {
+      await pool.query(
+        `UPDATE contracts SET status = 'expired'
+         WHERE end_date < CURRENT_DATE AND status IN ('active', 'approved')`
+      );
+    }
 
     const sortBy = sanitizeSortBy(
       req.query.sortBy as string,

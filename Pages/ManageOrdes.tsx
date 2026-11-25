@@ -82,29 +82,40 @@ export default function ManageOrders() {
       // Fetch ALL contracts/users (backend is paginated: default 20, max 100)
       const batchSize = 100;
 
-      const allContracts: any[] = [];
-      let contractsPage = 1;
-      while (true) {
-        const contractsResponse = await Contract.list(undefined, { includeAll: true }, contractsPage, batchSize);
-        allContracts.push(...(contractsResponse.data || []));
-        if (!contractsResponse.pagination || contractsPage >= contractsResponse.pagination.totalPages) break;
-        contractsPage++;
-      }
+      const fetchAllContracts = async () => {
+        const allContracts: any[] = [];
+        let contractsPage = 1;
+        while (true) {
+          const contractsResponse = await Contract.list(undefined, { includeAll: true }, contractsPage, batchSize);
+          allContracts.push(...(contractsResponse.data || []));
+          if (!contractsResponse.pagination || contractsPage >= contractsResponse.pagination.totalPages) break;
+          contractsPage++;
+        }
+        return allContracts;
+      };
 
-      const allUsers: any[] = [];
-      let usersPage = 1;
-      while (true) {
-        const usersResponse = await User.list(undefined, usersPage, batchSize);
-        allUsers.push(...(usersResponse.data || []));
-        if (!usersResponse.pagination || usersPage >= usersResponse.pagination.totalPages) break;
-        usersPage++;
-      }
+      const fetchAllUsers = async () => {
+        const allUsers: any[] = [];
+        let usersPage = 1;
+        while (true) {
+          const usersResponse = await User.list(undefined, usersPage, batchSize);
+          allUsers.push(...(usersResponse.data || []));
+          if (!usersResponse.pagination || usersPage >= usersResponse.pagination.totalPages) break;
+          usersPage++;
+        }
+        return allUsers;
+      };
+
+      // Independent requests: run them together instead of one after another
+      const [allContracts, allUsers] = await Promise.all([
+        fetchAllContracts(),
+        fetchAllUsers(),
+        loadOrders('all', 'all', 1, 20),
+      ]);
       const customerUsers = allUsers.filter(u => !['admin', 'manager', 'staff'].includes(u.role || 'user'));
 
       setContracts(allContracts as never[]);
       setCustomers(customerUsers as never[]);
-
-      await loadOrders('all', 'all', 1, 20);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to load data';
       setError(errorMessage);
