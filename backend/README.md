@@ -4,7 +4,7 @@ Node.js + Express + PostgreSQL backend API for the Rebate System.
 
 ## Prerequisites
 
-- Node.js (v18 or higher)
+- Node.js 20 (the production Docker image uses `node:20-alpine`)
 - PostgreSQL (v12 or higher)
 - npm or yarn
 
@@ -27,17 +27,12 @@ CREATE DATABASE rebate_system;
 
 ### 3. Configure Environment Variables
 
-Copy `.env.example` to `.env` and update the values:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your database credentials:
+Create `backend/.env` (it is git-ignored, so never commit it) with at least:
 
 ```env
 PORT=3000
 NODE_ENV=development
+DEV_LOCAL_ONLY=true        # dev: use only the local database, never Neon
 
 DB_HOST=localhost
 DB_PORT=5432
@@ -52,6 +47,8 @@ UPLOAD_DIR=./uploads/contracts
 MAX_FILE_SIZE=10485760
 ```
 
+For production variables (`NEON_DATABASE_URL`, `LOCAL_IS_PRIMARY`, `BIND_HOST`, `REDIS_URL`, Resend, VAPID, etc.), see [DEPLOYMENT.md](../DEPLOYMENT.md#3-backend-environment-variables) and [DATABASE_SETUP.md](DATABASE_SETUP.md).
+
 ### 4. Run Database Migrations
 
 ```bash
@@ -61,7 +58,7 @@ npm run migrate
 This will:
 - Create all database tables
 - Set up indexes and triggers
-- Create a default admin user (email: `apcoder3@gmail.com`, password: `1234`)
+- Create a default admin user if it doesn't exist yet (**change its password immediately**)
 
 ### 5. Start the Server
 
@@ -76,7 +73,9 @@ npm run build
 npm start
 ```
 
-The server will start on `http://localhost:3000`
+The server will start on `http://localhost:3000`.
+
+Production runs this backend in Docker (`backend/Dockerfile`) on our own server. See [DEPLOYMENT.md](../DEPLOYMENT.md).
 
 ## API Endpoints
 
@@ -107,12 +106,7 @@ The server will start on `http://localhost:3000`
 
 ## Default Users
 
-After running migrations, you'll have these default users:
-
-1. **Admin**
-   - Email: `apcoder3@gmail.com`
-   - Password: `1234`
-   - Role: `admin`
+On an empty database, migrations create one default **admin** account (see `src/db/migrate.ts`). Change its password right after the first login.
 
 You can create additional users through the registration endpoint or directly in the database.
 
@@ -130,6 +124,7 @@ You can create additional users through the registration endpoint or directly in
 - Role-based access control
 - File upload validation (PDF only)
 - SQL injection protection via parameterized queries
+- Rate limiting (Redis-backed): login/register 50 failed attempts per 15 min per IP + email; API 500 requests per 150 min per user, or per IP when not logged in. Real client IPs come from `app.set('trust proxy', 'loopback')` behind Nginx/Cloudflare.
 
 ## Development
 

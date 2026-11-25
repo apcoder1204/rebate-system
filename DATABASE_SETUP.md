@@ -1,5 +1,7 @@
 # Database Setup Guide
 
+> This guide sets up a **local development** database. For how production works (local primary + Neon backup) see [backend/DATABASE_SETUP.md](backend/DATABASE_SETUP.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
+
 ## Step 1: Install PostgreSQL (if not already installed)
 
 ### Ubuntu/Debian:

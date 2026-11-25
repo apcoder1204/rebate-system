@@ -14,32 +14,28 @@ Reports endpoints returning 404:
 
 ## Solution Steps
 
-### 1. Rebuild Backend
+> The backend now runs in Docker on our own Ubuntu server. See [DEPLOYMENT.md](DEPLOYMENT.md) for the full procedure. (PM2, systemd and Render are no longer used for the backend.)
+
+### 1. Sync the latest code to the server
+From the repo root on your dev machine:
 ```bash
-cd backend
-npm run build
+rsync -az --exclude node_modules --exclude .git --exclude dist \
+  --exclude .env --exclude uploads \
+  backend/ cctvpoint@<server>:/var/www/rebate-backend/
+```
+(Never add `--delete`: the server's `docker-compose.yml`, `scripts/` and `.env` exist only there.)
+
+### 2. Rebuild and restart the container
+The Docker build runs `npm run build` (`tsc`), so a TypeScript error makes the build fail before anything is replaced.
+```bash
+ssh cctvpoint@<server> "cd /var/www/rebate-backend && docker compose up -d --build"
 ```
 
-### 2. Verify Build Output
-Check that `backend/dist/routes/adminRoutes.js` contains:
-- `router.get('/reports/revenue', ...)`
-- `router.get('/reports/order-trends', ...)`
-- `router.get('/reports/summary', ...)`
-
-### 3. Restart Backend Server
-If using PM2:
+### 3. Verify Build Output
+Check inside the running container that the routes are compiled:
 ```bash
-pm2 restart rebate-api
+ssh cctvpoint@<server> "docker exec rebate-backend-backend-1 grep -c 'reports/' dist/routes/adminRoutes.js"
 ```
-
-If using systemd:
-```bash
-sudo systemctl restart rebate-api
-```
-
-If using Render/other platform:
-- Trigger a new deployment
-- Or restart the service
 
 ### 4. Test Endpoints
 ```bash
@@ -48,6 +44,9 @@ curl https://rebate-api.cctvpoint.org/api/admin/reports/summary \
 ```
 
 ### 5. Check Server Logs
+```bash
+ssh cctvpoint@<server> "docker logs rebate-backend-backend-1 --since 5m"
+```
 Look for route registration messages or errors during startup.
 
 ## Common Causes

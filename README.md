@@ -6,12 +6,16 @@ A full-stack rebate management system for tracking customer contracts, orders, a
 
 ```
 rebate system/
-├── backend/          # Node.js + Express + PostgreSQL API
+├── backend/          # Node.js + Express + PostgreSQL API (deployed with Docker)
 ├── Components/       # React UI components
-├── Pages/           # React page components
-├── entities/        # Frontend data models
-└── src/             # Frontend utilities and API client
+├── Context/          # React context providers (toasts, theme, session)
+├── Pages/            # React page components
+├── entities/         # Frontend data models
+├── main.tsx          # Frontend entry point and routes
+└── src/              # Frontend utilities and API client
 ```
+
+> If you add a new top-level folder containing React components, add it to `content` in `tailwind.config.js`. Otherwise Tailwind won't generate its classes. (This is why toast messages were once invisible.)
 
 ## Quick Start
 
@@ -32,11 +36,7 @@ npm install
 CREATE DATABASE rebate_system;
 ```
 
-4. Configure environment:
-```bash
-cp .env.example .env
-# Edit .env with your database credentials
-```
+4. Configure environment: create `backend/.env` with your local database credentials and `DEV_LOCAL_ONLY=true`, so development never touches production data. See `backend/README.md` for the variables.
 
 5. Run migrations:
 ```bash
@@ -70,10 +70,13 @@ npm run dev
 
 Frontend runs on `http://localhost:5173`
 
-## Default Login Credentials
+## Default Admin Account
 
-- **Admin**: `apcoder3@gmail.com` / `1234`
-- Create additional users through registration or database
+On first migration of an empty database, `backend/src/db/migrate.ts` creates a default admin account. **Change its password immediately.** Create additional users through registration or the admin pages.
+
+## Deployment
+
+Production runs the frontend on Vercel and the backend in Docker on our own Ubuntu server, with local PostgreSQL as primary and Neon as backup. See **[DEPLOYMENT.md](DEPLOYMENT.md)**.
 
 ## Features
 
