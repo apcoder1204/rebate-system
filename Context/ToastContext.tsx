@@ -65,7 +65,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   // Render toast container via portal to document.body so it escapes all stacking contexts
   const toastContainer = ReactDOM.createPortal(
-    <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2.5 items-end pointer-events-none">
+    <div className="fixed inset-0 z-[9999] flex flex-col gap-2.5 items-center justify-center p-4 pointer-events-none">
       {toasts.map((toast) => (
         <div key={toast.id} className="pointer-events-auto">
           <ToastComponent toast={toast} onClose={removeToast} />

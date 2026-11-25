@@ -68,7 +68,7 @@ export function ToastComponent({ toast, onClose }: ToastProps) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    // Trigger slide-in
+    // Trigger fade/zoom-in
     const show = requestAnimationFrame(() => setVisible(true));
 
     // Progress bar countdown
@@ -98,7 +98,7 @@ export function ToastComponent({ toast, onClose }: ToastProps) {
       className={`relative w-80 max-w-[calc(100vw-2rem)] rounded-xl border shadow-xl overflow-hidden
         ${c.bg} ${c.border}
         transition-all duration-300 ease-out
-        ${visible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}
+        ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
     >
       {/* Left accent stripe */}
       <div className={`absolute inset-y-0 left-0 w-1 ${c.bar}`} />
